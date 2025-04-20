@@ -56,7 +56,6 @@ public class Gameplay extends AppCompatActivity implements View.OnClickListener 
     // Constants
     private static final String TAG = "Gameplay";
     private static final String SERVER_URL = "http://10.0.2.2:8080";
-    private static final String musicUrl = "https://freesound.org/people/leehayeskerr/sounds/548480/battlefield.mp3";
 
 
     // User and Game Data
@@ -383,7 +382,6 @@ public class Gameplay extends AppCompatActivity implements View.OnClickListener 
     private void startBackgroundMusic() {
         // Start PlayService with the music URL
         Intent playIntent = new Intent(this, PlayService.class);
-        playIntent.putExtra("link", musicUrl);
         startService(playIntent);
     }
     /**
