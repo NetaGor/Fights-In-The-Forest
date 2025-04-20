@@ -16,9 +16,7 @@ Author: Original author unknown, documentation added April 2025
 
 import threading
 import time
-import os
 from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_v1_5
 import base64
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -31,6 +29,8 @@ import traceback
 from flask_cors import CORS
 import json
 from HybridEncryption import HybridEncryption
+from KeyFileEncryption import KeyFileEncryption
+
 
 # Dictionary to track active game rooms and connected clients
 active_rooms = {}
@@ -73,6 +73,10 @@ print("Connected to Firebase Firestore")
 # Constants and configuration
 USERS_COLLECTION = "users"
 hybrid_encryption = HybridEncryption()
+db_encryption = KeyFileEncryption()
+SENSITIVE_CHARACTER_FIELDS = ['desc', 'abilities']
+SENSITIVE_ROOM_FIELDS = ['chat_log']
+
 
 #################################################
 # ENCRYPTION AND SECURITY FUNCTIONS
@@ -243,28 +247,17 @@ def hash_password(password):
 
 # Encrypts sensitive fields in a character before database storage
 def encrypt_character(character):
-    """
-    Store character without encryption
-
-    Args:
-        character (dict): Character data
-
-    Returns:
-        dict: Character without encryption
-    """
-    return character.copy()
+    """Encrypt sensitive fields in a character before database storage"""
+    return db_encryption.encrypt_document(character, SENSITIVE_CHARACTER_FIELDS)
 
 
 # Decrypts sensitive fields in a character after database retrieval
 def decrypt_character(character):
-    """
-    Return character data without decryption
-    """
+    """Decrypt sensitive fields in a character after database retrieval"""
     if not character:
         return character
 
-    # Simply return a copy of the character
-    return character.copy()
+    return db_encryption.decrypt_document(character, SENSITIVE_CHARACTER_FIELDS)
 
 
 # Verifies a password against its hashed version
@@ -1576,22 +1569,6 @@ def remove_player_from_room():
 # Retrieves all data for a specific room
 @app.route('/get_room_data', methods=['POST'])
 def get_room_data():
-    """
-    Get all data for a specific room.
-
-    Request format:
-    {
-        "room_code": string,
-        "username": string
-    }
-
-    Response:
-    {
-        "data": {
-            // full room data object
-        }
-    }
-    """
     try:
         data = request.get_json()
         request_json = decrypt_request(data)
@@ -1607,8 +1584,16 @@ def get_room_data():
             return jsonify(encrypt_response(error_response, username)), 404
 
         room_data = room_doc.to_dict()
-        response_data = {'data': room_data}
 
+        # Decrypt chat log if it exists
+        if 'chat_log' in room_data and room_data['chat_log']:
+            decrypted_chat_log = []
+            for chat_entry in room_data['chat_log']:
+                decrypted_entry = db_encryption.decrypt_field(chat_entry)
+                decrypted_chat_log.append(decrypted_entry)
+            room_data['chat_log'] = decrypted_chat_log
+
+        response_data = {'data': room_data}
         return jsonify(encrypt_response(response_data, username))
 
     except Exception as e:
@@ -2001,8 +1986,6 @@ def start_turn_timer(room_code, current_player, next_player):
                 encrypted_notification = encrypt_response(notification_data, client_username)
                 socketio.emit('turn_started', encrypted_notification, to=sid)
 
-    # No server-side timer setup - client will send skip_turn when timer expires
-
 
 # Handles ability lookup during gameplay
 @socketio.on('get_ability')
@@ -2165,11 +2148,14 @@ def on_make_move(data):
         if 'chat_log' not in room_data:
             room_data['chat_log'] = []
 
-        room_data['chat_log'].append({
+        chat_entry = {
             'message': chat_message,
             'effect': effect_message,
             'turn': current_turn
-        })
+        }
+        # Encrypt the entire chat entry
+        encrypted_chat_entry = db_encryption.encrypt_field(chat_entry)
+        room_data['chat_log'].append(encrypted_chat_entry)
 
         # Check if target died
         if new_health <= 0:
@@ -2487,9 +2473,6 @@ def next_turn(room_code):
 # Returns the current game state to a player
 @socketio.on('get_game_state')
 def on_get_game_state(data):
-    """
-    Get the current game state for a player without decryption.
-    """
     try:
         request_json = decrypt_request(data)
 
@@ -2509,7 +2492,14 @@ def on_get_game_state(data):
 
         room_data = room_doc.to_dict()
 
-        # No decryption needed
+        # Get the chat log and decrypt it
+        chat_log = []
+        if 'chat_log' in room_data and room_data['chat_log']:
+            # Get the last 10 messages
+            recent_chat = room_data['chat_log'][-10:]
+            for chat_entry in recent_chat:
+                decrypted_entry = db_encryption.decrypt_field(chat_entry)
+                chat_log.append(decrypted_entry)
 
         # Filter out just what we need for game state
         game_state = {
@@ -2518,7 +2508,7 @@ def on_get_game_state(data):
             'current_player': None,
             'next_player': None,
             'character_health': room_data.get('character_health', {}),
-            'chat_log': room_data.get('chat_log', [])[-10:],  # Last 10 messages only
+            'chat_log': chat_log,  # Use decrypted chat log
             'group1': room_data.get('group1', {}),
             'group2': room_data.get('group2', {})
         }
@@ -2536,6 +2526,7 @@ def on_get_game_state(data):
 
     except Exception as e:
         print(f"Error getting game state: {str(e)}")
+        import traceback
         traceback.print_exc()
         error_response = {'error': f'Error getting game state: {str(e)}'}
         return encrypt_response(error_response, username) if username else error_response
@@ -2617,7 +2608,16 @@ def on_reconnect_to_game(data):
                 'duration': 60
             }
 
-        # Prepare reconnection data with complete game state - no decryption needed
+            # Decrypt chat log for reconnection sync
+        chat_log = []
+        if 'chat_log' in room_data and room_data['chat_log']:
+            # Get the last 10 messages
+            recent_chat = room_data['chat_log'][-10:]
+            for chat_entry in recent_chat:
+                decrypted_entry = db_encryption.decrypt_field(chat_entry)
+                chat_log.append(decrypted_entry)
+
+        # Prepare reconnection data with complete game state
         reconnection_data = {
             'event': 'reconnection_sync',
             'current_player': current_player,
@@ -2625,7 +2625,7 @@ def on_reconnect_to_game(data):
             'character_health': room_data.get('character_health', {}),
             'group1': room_data.get('group1', {}),
             'group2': room_data.get('group2', {}),
-            'chat_log': room_data.get('chat_log', [])[-10:],  # Last 10 messages
+            'chat_log': chat_log,  # Use decrypted chat log
             'turn_timer': turn_timer_info,
             'game_status': status,
             'turn': current_turn
