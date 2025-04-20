@@ -7,7 +7,6 @@ using Fernet symmetric encryption with a static key stored in a file.
 
 import os
 import json
-import base64
 from cryptography.fernet import Fernet
 
 class KeyFileEncryption:
@@ -79,7 +78,6 @@ class KeyFileEncryption:
 
         except Exception as e:
             print(f"Encryption error: {str(e)}")
-            # Return the original data on error to prevent data loss
             return str(data)
 
     def decrypt_field(self, encrypted_data):
@@ -120,7 +118,7 @@ class KeyFileEncryption:
 
         except Exception as e:
             print(f"Decryption error: {str(e)}")
-            return encrypted_data  # Return the encrypted data on error
+            return encrypted_data
 
     def encrypt_document(self, document, sensitive_fields):
         """
