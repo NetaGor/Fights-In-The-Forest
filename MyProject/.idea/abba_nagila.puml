@@ -1,0 +1,423 @@
+@startuml
+class com.example.myproject.Gameplay {
+- CustomButton ability1
+- TextView currentPlayer
+- RecyclerView chatRecyclerView
+- {static} String TAG
+- {static} String SERVER_URL
+- String username
+~ {static} List<CharactersList> group1
+~ {static} List<CharactersList> group2
+- CharactersList user_character
+~ {static} Map<String,Integer> characterHealth
+- List<String> chatMessages
+- ChatAdapter chatAdapter
+- Handler timerHandler
+- Runnable timerRunnable
+- long turnStartTime
+- long turnDuration
+- boolean isTurn
+- String currentTurnPlayer
+- String nextTurnPlayer
+- RSAEncryption rsaEncryption
+- HybridEncryption hybridEncryption
+- OkHttpClient client
+- RSAPrivateKey privateKey
+- Socket mSocket
+- AlertDialog loadingDialog
+- boolean gameEnded
+- boolean gameStarted
+- Emitter.Listener onTurnStarted
+- Emitter.Listener onTurnExpired
+- Emitter.Listener onMoveMade
+- Emitter.Listener onSkipMade
+- Emitter.Listener onGameEnded
+- Emitter.Listener onGameStartFailed
+# void onCreate(Bundle)
+- void initializeUIComponents()
+- void setupSocketListeners()
+- void setupWebSocket()
+- void joinRoom()
+- void getGameState()
+- void startBackgroundMusic()
+- void stopBackgroundMusic()
+- void startCountdown()
+- void startNextTurn(String,String)
+- void updateTimerDisplay(int)
+- void updateAbilityButtonsState(boolean)
+- void disableAllAbilityButtons()
+- void setAbilitiesToButtons()
+- void setAbilityButtonText(CustomButton,List<String>,int)
+- void loadCharacter()
+- void getGroups()
+- void getGroup1()
+- void getGroup2()
++ void onClick(View)
+- void getAbilityDetails(String)
+- void rollDiceAndMakeMove(String,String,String,int,String)
+- void sendMoveToServer(String,String,String,int)
+- void sendSkipToServer()
+- void showAbilityDescriptionDialog(String,String,String,int,String)
+- void showTargetSelectionDialog(String,String,int,String)
+- void showHealthStatusDialog()
+- void showGameEndDialog(String)
+- void showLoadingDialog(String)
+- void dismissLoadingDialog()
+# void onDestroy()
++ void onBackPressed()
+}
+
+
+class com.example.myproject.TargetAdapter {
++ View getView(int,View,ViewGroup)
+}
+
+class com.example.myproject.CharactersCreationRoom {
+~ {static} List<CharactersList> characters
+~ String username
+- CustomButton addCharacterButton
+- ListView characterListView
+- CharactersListAdapter adapter
+- RSAEncryption rsaEncryption
+- HybridEncryption hybridEncryption
+- RSAPrivateKey privateKey
+- {static} String TAG
+- {static} String SERVER_URL
+# void onCreate(Bundle)
++ void onClick(View)
++ void onActivityResult(int,int,Intent)
+- void loadCharacters()
+- void deleteCharacter(int)
+}
+
+
+class com.example.myproject.ChatAdapter {
+- List<String> chatMessages
++ ChatViewHolder onCreateViewHolder(ViewGroup,int)
++ void onBindViewHolder(ChatViewHolder,int)
++ int getItemCount()
+}
+
+
+class com.example.myproject.ChatAdapter$ChatViewHolder {
+~ TextView messageText
+}
+
+class com.example.myproject.PlayService {
+- MediaPlayer mediaPlayer
++ void onCreate()
++ int onStartCommand(Intent,int,int)
++ void onPrepared(MediaPlayer)
++ void onCompletion(MediaPlayer)
++ void onDestroy()
++ void onBufferingUpdate(MediaPlayer,int)
++ void onSeekComplete(MediaPlayer)
++ boolean onError(MediaPlayer,int,int)
++ boolean onInfo(MediaPlayer,int,int)
++ IBinder onBind(Intent)
+}
+
+
+class com.example.myproject.Login {
+- CustomButton enter
+- EditText username
+- CheckBox rememberMe
+- RSAEncryption rsaEncryption
+- HybridEncryption hybridEncryption
+- KeyPair keyPair
+- RSAPublicKey publicKey
+- RSAPrivateKey privateKey
+- {static} String SERVER_URL
+- {static} String REMEMBER_ME_PREFS
+# void onCreate(Bundle)
++ void onClick(View)
+- void sendLoginRequest(String,String)
+- void saveCurrentConnection(String)
+- void saveUserCredentials(String,String)
+- void loadSavedCredentials()
+}
+
+
+class com.example.myproject.CustomButton {
+- Paint paintBackground
+- RectF rect
+- boolean isPressed
+- String buttonText
+- OnClickListener onClickListener
+- Typeface buttonTypeface
+- void init(Context,AttributeSet)
+# void onSizeChanged(int,int,int,int)
+# void onDraw(Canvas)
++ boolean onTouchEvent(MotionEvent)
++ boolean performClick()
++ void setOnClickListener(OnClickListener)
++ void setButtonText(String)
++ void setTextSize(float)
++ void setTextColor(int)
++ void setButtonFont(Typeface)
++ String getButtonText()
+}
+
+
+class com.example.myproject.Welcome {
+~ CustomButton characters
+~ CustomButton fight
+~ CustomButton log_out
+# void onCreate(Bundle)
++ void onClick(View)
+}
+
+
+class com.example.myproject.CharactersListAdapter {
+- Context context
+- List<CharactersList> characters
++ View getView(int,View,ViewGroup)
+}
+
+
+class com.example.myproject.MainActivity {
+~ CustomButton btn_login
+~ CustomButton btn_register
+~ BroadCastBattery broadCastBattery
+# void onCreate(Bundle)
+# void onResume()
+# void onPause()
++ void onClick(View)
+}
+
+
+class com.example.myproject.MainActivity$BroadCastBattery {
++ void onReceive(Context,Intent)
+}
+
+class com.example.myproject.Rooms {
+- {static} String TAG
+- AlertDialog currentDialog
+- RSAEncryption rsaEncryption
+- HybridEncryption hybridEncryption
+- KeyPair keyPair
+- RSAPrivateKey privateKey
+- String username
+- String roomCode
+- {static} String SERVER_URL
+- AlertDialog loadingDialog
+# void onCreate(Bundle)
++ void onClick(View)
+- void showJoinRoomDialog()
+- void showCreateRoomDialog()
+- void showLoadingDialog(String)
+- void dismissLoadingDialog()
+- void handleJoinButtonClick(View)
+- void handleCreateButtonClick()
+- void handleBackButtonClick()
+- void joinRoom(String)
+- void createRoom()
+- boolean isNetworkAvailable()
+# void onDestroy()
+}
+
+
+class com.example.myproject.RSAEncryption {
+- Context context
+- {static} String TAG
+- {static} int DEFAULT_KEY_SIZE
+- {static} String PREFS_NAME
+- {static} String PREF_PUBLIC_KEY
+- {static} String PREF_PRIVATE_KEY
++ KeyPair generateKeyPair(int)
++ KeyPair generateKeyPair()
++ String exportPublicKeyToBase64(RSAPublicKey)
++ String exportPrivateKeyToBase64(RSAPrivateKey)
++ void saveKeyPairToSharedPreferences(KeyPair)
++ RSAPublicKey loadPublicKey(int)
++ RSAPrivateKey loadPrivateKeyFromSharedPreferences()
++ RSAPublicKey loadPublicKeyFromBase64(String)
++ RSAPrivateKey loadPrivateKeyFromBase64(String)
++ KeyPair loadKeyPairFromSharedPreferences()
++ boolean keysExistInSharedPreferences()
++ KeyPair generateAndSaveKeyPair()
++ KeyPair getOrCreateKeyPair()
+}
+
+
+class com.example.myproject.CharactersList {
+- String characterName
+- String description
+- List<String> abilities
+- String username
+- int health
++ String getCharacterName()
++ void setCharacterName(String)
++ String getUsername()
++ void setUsername(String)
++ String getDescription()
++ void setDescription(String)
++ List<String> getAbilities()
++ void setAbilities(List<String>)
++ int getHealth()
++ void setHealth(int)
+}
+
+
+class com.example.myproject.WaitingRoom {
+- {static} String TAG
+- {static} String SERVER_URL
+- ListView listRoomGroup1
+- TextView room_code_display
+- CustomButton playButton
+~ {static} List<CharactersList> myCharacters
+~ {static} List<CharactersList> group1
+~ {static} List<CharactersList> group2
+- CharactersListAdapter characterAdapterGroup1
+- Socket mSocket
+- String currentPlayerCharacter
+- String currentGroup
+- String username
+- boolean is_pressed
+- boolean isTransitioningToGameplay
+- AlertDialog countdownDialog
+- RSAEncryption rsaEncryption
+- HybridEncryption hybridEncryption
+- OkHttpClient client
+- KeyPair keyPair
+- RSAPrivateKey privateKey
+- AlertDialog loadingDialog
+- Emitter.Listener onNewPlayer
+- Emitter.Listener onGroupChange
+- Emitter.Listener onPlayerReady
+- Emitter.Listener onPlayerUnready
+- Emitter.Listener onGameStarted
+- Emitter.Listener onValidateConnection
+- Emitter.Listener onGameStartFailed
+# void onCreate(Bundle)
+- void initializeUIComponents()
+- void initializeAdapters()
+- void setupSocketListeners()
+- void setupWebSocket()
+- void showCountdownDialog(int)
++ void onClick(View)
+- void joinRoom()
+- void handleGroupJoin(View)
+- void handlePlayButtonClick()
+- void loadCharacters()
+- void refreshGroupsData()
+- void getGroup1()
+- void getGroup2()
+- void removePlayerFromRoom()
+- void showLoadingDialog(String)
+- void dismissLoadingDialog()
++ void onBackPressed()
+# void onResume()
+# void onPause()
+# void onDestroy()
+}
+
+
+class com.example.myproject.GlobalSocketManager {
+- {static} Socket mSocket
++ {static} void setSocket(Socket)
++ {static} Socket getSocket()
+}
+
+
+class com.example.myproject.HealthAdapter {
++ View getView(int,View,ViewGroup)
+}
+
+class com.example.myproject.HybridEncryption {
+- {static} String TAG
+- Context context
+- RSAEncryption rsaEncryption
+- RSAPublicKey serverPublicKey
+- {static} byte[] SYMMETRIC_KEY
+- {static} byte[] SYMMETRIC_IV
+- void loadServerPublicKey()
++ RSAPublicKey getServerPublicKey()
++ JSONObject encryptWithPublicKey(Object)
++ JSONObject encryptSymmetric(Object)
++ Object decryptWithPrivateKey(JSONObject,RSAPrivateKey)
++ Object decryptSymmetric(Object)
+}
+
+
+class com.example.myproject.EditCharactersCreationRoom {
+- EditText characterNameEditText
+- CustomButton saveButton
+- List<String> abilities
+- List<String> selectedAbilitiesList
+- List<Toolbar> toolbars
+- Map<Toolbar,String> toolbarAbilities
+- String username
+- RSAEncryption rsaEncryption
+- HybridEncryption hybridEncryption
+- RSAPrivateKey privateKey
+- int characterIndex
+- {static} String SERVER_URL
+# void onCreate(Bundle)
+- void showAbilityPicker(Toolbar)
+- void assignAbilityToToolbar(Toolbar,String)
+- void loadExistingAbilities(List<String>)
+- void getAbilityDetails(String)
+- void showAbilityDescriptionDialog(String,String)
+- void showAbilitiesDescriptionsDialog()
+- void loadAbilitiesFromServer()
+- void saveCharacter()
+}
+
+
+class com.example.myproject.Register {
+- CustomButton enter
+- EditText username
+- CheckBox rememberMe
+- RSAEncryption rsaEncryption
+- HybridEncryption hybridEncryption
+- KeyPair keyPair
+- RSAPublicKey publicKey
+- RSAPrivateKey privateKey
+- {static} String SERVER_URL
+- {static} String REMEMBER_ME_PREFS
+# void onCreate(Bundle)
++ void onClick(View)
+- void sendRegistrationRequest(String,String)
+- void saveCurrentConnection(String)
+- void saveUserCredentials(String,String)
+}
+
+
+
+
+com.example.myproject.OnClickListener <|.. com.example.myproject.Gameplay
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.Gameplay
+android.widget.ArrayAdapter <|-- com.example.myproject.TargetAdapter
+com.example.myproject.OnClickListener <|.. com.example.myproject.CharactersCreationRoom
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.CharactersCreationRoom
+com.example.myproject.Adapter <|-- com.example.myproject.ChatAdapter
+com.example.myproject.ChatAdapter +.. com.example.myproject.ChatAdapter$ChatViewHolder
+com.example.myproject.ViewHolder <|-- com.example.myproject.ChatAdapter$ChatViewHolder
+com.example.myproject.OnCompletionListener <|.. com.example.myproject.PlayService
+com.example.myproject.OnPreparedListener <|.. com.example.myproject.PlayService
+com.example.myproject.OnSeekCompleteListener <|.. com.example.myproject.PlayService
+com.example.myproject.OnInfoListener <|.. com.example.myproject.PlayService
+com.example.myproject.OnBufferingUpdateListener <|.. com.example.myproject.PlayService
+com.example.myproject.OnErrorListener <|.. com.example.myproject.PlayService
+android.app.Service <|-- com.example.myproject.PlayService
+com.example.myproject.OnClickListener <|.. com.example.myproject.Login
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.Login
+android.view.View <|-- com.example.myproject.CustomButton
+com.example.myproject.OnClickListener <|.. com.example.myproject.Welcome
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.Welcome
+android.widget.ArrayAdapter <|-- com.example.myproject.CharactersListAdapter
+com.example.myproject.OnClickListener <|.. com.example.myproject.MainActivity
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.MainActivity
+com.example.myproject.MainActivity +.. com.example.myproject.MainActivity$BroadCastBattery
+com.example.myproject.BroadcastReceiver <|-- com.example.myproject.MainActivity$BroadCastBattery
+com.example.myproject.OnClickListener <|.. com.example.myproject.Rooms
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.Rooms
+java.io.Serializable <|.. com.example.myproject.CharactersList
+com.example.myproject.OnClickListener <|.. com.example.myproject.WaitingRoom
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.WaitingRoom
+android.widget.ArrayAdapter <|-- com.example.myproject.HealthAdapter
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.EditCharactersCreationRoom
+com.example.myproject.OnClickListener <|.. com.example.myproject.Register
+androidx.appcompat.app.AppCompatActivity <|-- com.example.myproject.Register
+@enduml

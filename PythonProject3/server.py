@@ -73,7 +73,7 @@ print("Connected to Firebase Firestore")
 
 # Constants and configuration
 USERS_COLLECTION = "users"
-encryption_key = os.environ.get('dskvhnjksdnvkjehfbdskbv')
+encryption_key = os.environ.get('DB_ENCRYPTION_KEY')
 db_encryption = DBEncryption(encryption_key)
 hybrid_encryption = HybridEncryption()
 
@@ -259,29 +259,29 @@ def encrypt_character(character):
     if "desc" in encrypted:
         encrypted["desc"] = db_encryption.encrypt_field(encrypted["desc"])
     if "abilities" in encrypted:
-        encrypted["abilities"] = db_encryption.encrypt_field(encrypted["abilities"])
+        encrypted["abilities"] = db_encryption.encrypt_field(json.dumps(encrypted["abilities"]))
     return encrypted
 
 
 # Decrypts sensitive fields in a character after database retrieval
 def decrypt_character(encrypted_character):
     """
-    Decrypt sensitive fields in a character
-
-    Args:
-        encrypted_character (dict): Character with encrypted fields
-
-    Returns:
-        dict: Character with decrypted fields
+    Decrypt sensitive fields in a character with error handling
     """
     if not encrypted_character:
         return encrypted_character
 
     character = encrypted_character.copy()
-    if "desc" in character:
-        character["desc"] = db_encryption.decrypt_field(character["desc"])
-    if "abilities" in character:
-        character["abilities"] = db_encryption.decrypt_field(character["abilities"])
+    try:
+        if "desc" in character:
+            character["desc"] = db_encryption.decrypt_field(character["desc"])
+        if "abilities" in character:
+            character["abilities"] = json.loads(db_encryption.decrypt_field(character["abilities"]))
+    except Exception as e:
+        print(f"Decryption error for character: {character.get('name', 'unknown')}: {str(e)}")
+        character["desc"] = "Error: Could not decrypt description"
+        character["abilities"] = []
+
     return character
 
 
