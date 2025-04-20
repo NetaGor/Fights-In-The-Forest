@@ -29,7 +29,6 @@ import traceback
 from flask_cors import CORS
 import json
 from HybridEncryption import HybridEncryption
-from KeyFileEncryption import KeyFileEncryption
 
 
 # Dictionary to track active game rooms and connected clients
@@ -73,9 +72,6 @@ print("Connected to Firebase Firestore")
 # Constants and configuration
 USERS_COLLECTION = "users"
 hybrid_encryption = HybridEncryption()
-db_encryption = KeyFileEncryption()
-SENSITIVE_CHARACTER_FIELDS = ['desc', 'abilities']
-SENSITIVE_ROOM_FIELDS = ['chat_log']
 
 
 #################################################
@@ -216,6 +212,36 @@ def decrypt_request(request_data):
         raise
 
 
+# Encrypts response data using the hybrid encryption system
+def encrypt_db(data):
+    """
+    Encrypt response data using the hybrid encryption system
+
+    Args:
+        response_data (dict/str): The data to encrypt
+        username (str, optional): The username to determine the public key to use
+
+    Returns:
+        dict: The encrypted data in the appropriate format
+    """
+    # Symmetric encryption
+    return hybrid_encryption.encrypt_symmetric(data)
+
+
+# Decrypts request data using the hybrid encryption system
+def decrypt_db(data):
+    """
+    Decrypt request data using the hybrid encryption system
+
+    Args:
+        request_data (dict): The encrypted request data
+
+    Returns:
+        dict/str: The decrypted data
+    """
+    return hybrid_encryption.decrypt_symmetric(data)
+
+
 # Checks if a username already exists in the database
 def user_exists(username):
     """
@@ -243,21 +269,6 @@ def hash_password(password):
         str: The hashed password as a string
     """
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-
-# Encrypts sensitive fields in a character before database storage
-def encrypt_character(character):
-    """Encrypt sensitive fields in a character before database storage"""
-    return db_encryption.encrypt_document(character, SENSITIVE_CHARACTER_FIELDS)
-
-
-# Decrypts sensitive fields in a character after database retrieval
-def decrypt_character(character):
-    """Decrypt sensitive fields in a character after database retrieval"""
-    if not character:
-        return character
-
-    return db_encryption.decrypt_document(character, SENSITIVE_CHARACTER_FIELDS)
 
 
 # Verifies a password against its hashed version
@@ -512,8 +523,7 @@ def get_character():
         username = request_json.get('username')
         name = request_json.get('name')
 
-        encrypted_character = get_character_func(username, name)
-        character = decrypt_character(encrypted_character)
+        character = get_character_func(username, name)
 
         response_data = {"character": character}
         return jsonify(encrypt_response(response_data, username))
@@ -542,7 +552,7 @@ def get_characters_func(username):
 
     # Get encrypted characters and decrypt them
     encrypted_characters = [doc.to_dict() for doc in docs]
-    return [decrypt_character(char) for char in encrypted_characters]
+    return [char for char in encrypted_characters]
 
 
 # Retrieves raw (encrypted) character data by name
@@ -665,8 +675,8 @@ def save_character():
 
         character = {
             "name": character_data["name"],
-            "desc": character_data["desc"],
-            "abilities": character_data["abilities"],
+            "desc": encrypt_db(character_data["desc"]),
+            "abilities": encrypt_db(character_data["abilities"]),
         }
 
         if character_index == -1:
@@ -737,8 +747,8 @@ def edit_character():
             error_response = {"error": "Missing username or character ID"}
             return jsonify(encrypt_response(error_response, username)), 400
 
-        new_desc = edit_data.get("desc")
-        new_abilities = edit_data.get("abilities")
+        new_desc = encrypt_db(edit_data.get("desc"))
+        new_abilities = encrypt_db(edit_data.get("abilities"))
 
         # Get decrypted characters
         characters = get_characters_func(username)
@@ -757,9 +767,8 @@ def edit_character():
             error_response = {"error": "Character not found"}
             return jsonify(encrypt_response(error_response, username)), 404
 
-        # Encrypt characters before saving
-        encrypted_characters = [encrypt_character(char) for char in characters]
-        update_characters(username, encrypted_characters)
+        # Saving character
+        update_characters(username, [char for char in characters])
 
         response_data = {"message": "Character updated successfully", "characters": characters}
         return jsonify(encrypt_response(response_data, username))
@@ -1587,11 +1596,10 @@ def get_room_data():
 
         # Decrypt chat log if it exists
         if 'chat_log' in room_data and room_data['chat_log']:
-            decrypted_chat_log = []
+            chat_log = []
             for chat_entry in room_data['chat_log']:
-                decrypted_entry = db_encryption.decrypt_field(chat_entry)
-                decrypted_chat_log.append(decrypted_entry)
-            room_data['chat_log'] = decrypted_chat_log
+                chat_log.append(chat_entry)
+            room_data['chat_log'] = chat_log
 
         response_data = {'data': room_data}
         return jsonify(encrypt_response(response_data, username))
@@ -2154,8 +2162,7 @@ def on_make_move(data):
             'turn': current_turn
         }
         # Encrypt the entire chat entry
-        encrypted_chat_entry = db_encryption.encrypt_field(chat_entry)
-        room_data['chat_log'].append(encrypted_chat_entry)
+        room_data['chat_log'].append(chat_entry)
 
         # Check if target died
         if new_health <= 0:
@@ -2498,8 +2505,7 @@ def on_get_game_state(data):
             # Get the last 10 messages
             recent_chat = room_data['chat_log'][-10:]
             for chat_entry in recent_chat:
-                decrypted_entry = db_encryption.decrypt_field(chat_entry)
-                chat_log.append(decrypted_entry)
+                chat_log.append(chat_entry)
 
         # Filter out just what we need for game state
         game_state = {
@@ -2614,8 +2620,7 @@ def on_reconnect_to_game(data):
             # Get the last 10 messages
             recent_chat = room_data['chat_log'][-10:]
             for chat_entry in recent_chat:
-                decrypted_entry = db_encryption.decrypt_field(chat_entry)
-                chat_log.append(decrypted_entry)
+                chat_log.append(chat_entry)
 
         # Prepare reconnection data with complete game state
         reconnection_data = {
