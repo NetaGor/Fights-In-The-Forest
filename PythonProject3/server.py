@@ -354,7 +354,7 @@ def register():
         # Save user with encrypted sensitive fields
         user_data = {
             'username': username,
-            'password': db_encryption.encrypt_field(hashed_password)
+            'password': hashed_password
         }
 
         if user_public_key:
@@ -428,12 +428,11 @@ def login():
 
         # Decrypt the stored password
         stored_password_enc = user_data.get("password", "")
-        stored_password = db_encryption.decrypt_field(stored_password_enc)
-
+        hashed_pass = hash_password(password)
         # Check password
-        is_valid_password = check_password(stored_password, password)
 
-        if not is_valid_password:
+
+        if hashed_pass != stored_password_enc:
             error_response = {"status": "error", "message": "Invalid password."}
             # Try to encrypt with the provided public key
             if user_public_key:
