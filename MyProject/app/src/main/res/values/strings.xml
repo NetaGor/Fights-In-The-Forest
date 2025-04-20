@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">MyProject</string>
+    <string name="room_code">Room code:</string>
+    <string name="service_desc">Background Music Service</string>
+</resources>

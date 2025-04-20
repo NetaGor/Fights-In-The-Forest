@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:padding="20dp"
+    android:background="@drawable/background">
+
+    <EditText
+        android:id="@+id/room_code"
+        android:hint="Enter Room Code"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="10dp"
+        android:textColor="#AAAAAA"
+        android:fontFamily="@font/reliesta_display"
+        android:textColorHint="#888888"
+        android:textSize="16sp" />
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/join_button"
+        app:buttonText="Join"
+        app:textColor="#000000"
+        app:textSize="20sp"
+        app:buttonFont="@font/pine_forest"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginTop="10dp" />
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/back_button"
+        app:buttonText="Back"
+        app:textColor="#000000"
+        app:textSize="20sp"
+        app:buttonFont="@font/pine_forest"
+        android:layout_width="match_parent"
+        android:layout_height="50dp" />
+</LinearLayout>

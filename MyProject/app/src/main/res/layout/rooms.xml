@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    tools:context=".Rooms"
+    android:background="@drawable/background">
+
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/join_room"
+        android:layout_marginBottom="5dp"
+        app:buttonText="Join Room"
+        app:textColor="#000000"
+        app:textSize="40sp"
+        app:buttonFont="@font/pine_forest"
+        android:layout_width="250dp"
+        android:layout_height="80dp"
+        android:layout_gravity="center"/>
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/create_room"
+        android:layout_marginBottom="5dp"
+        app:buttonText="Create Room"
+        app:textColor="#000000"
+        app:textSize="40sp"
+        app:buttonFont="@font/pine_forest"
+        android:layout_width="250dp"
+        android:layout_height="80dp"
+        android:layout_gravity="center"/>
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/back_welcome"
+        app:buttonText="Back"
+        app:textColor="#000000"
+        app:textSize="40sp"
+        app:buttonFont="@font/pine_forest"
+        android:layout_width="250dp"
+        android:layout_height="80dp"
+        android:layout_gravity="center"/>
+
+
+</LinearLayout>

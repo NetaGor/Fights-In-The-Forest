@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "938113766364",
+    "project_id": "fightsintheforest",
+    "storage_bucket": "fightsintheforest.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:938113766364:android:08039e2060ecdefd79f519",
+        "android_client_info": {
+          "package_name": "com.example.myproject"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCj1HcY7-lN8gdXfsnRIaPAndGlHyGLJhM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:paddingTop="130dp"
+    android:background="@drawable/character">
+
+    <ListView
+        android:id="@+id/list_characters"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/add_character"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        app:buttonText="Add Character"
+        app:textColor="#000000"
+        app:textSize="40dp"
+        app:buttonFont="@font/pine_forest" />
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/back"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        app:buttonText="Back"
+        app:textColor="#000000"
+        app:textSize="40dp"
+        app:buttonFont="@font/pine_forest"/>
+</LinearLayout>

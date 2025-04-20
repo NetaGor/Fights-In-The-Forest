@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Blade of the sword (larger and thinner) -->
+    <path
+        android:fillColor="#A9A9A9"
+        android:pathData="M50,20 L58,20 L58,70 L50,70 Z" /> <!-- Gray color for the blade -->
+
+    <!-- Sword Tip (thinner) -->
+    <path
+        android:fillColor="#A9A9A9"
+        android:pathData="M54,15 L58,20 L50,20 Z" /> <!-- Gray color for the sword tip -->
+
+    <!-- Crossguard (slightly less wide) -->
+    <path
+        android:fillColor="#808080"
+        android:pathData="M44,70 L64,70 L64,75 L44,75 Z" /> <!-- Darker gray for the crossguard, less wide -->
+
+    <!-- Handle (narrower than the blade) -->
+    <path
+        android:fillColor="#696969"
+        android:pathData="M52,75 L56,75 L56,95 L52,95 Z" /> <!-- Dark gray for the handle -->
+
+
+
+</vector>

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/background">
+
+    <EditText
+        android:id="@+id/character_name_edit_text"
+        android:textColorHint="#888888"
+        android:textColor="#AAAAAA"
+        android:fontFamily="@font/reliesta_display"        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Character name" />
+
+    <EditText
+        android:id="@+id/description_edit_text"
+        android:textColorHint="#888888"
+        android:textColor="#AAAAAA"
+        android:fontFamily="@font/reliesta_display"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Description" />
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/view_abilities_button"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="16dp"
+        app:buttonText="View Abilities Descriptions"
+        app:buttonFont="@font/pine_forest"
+        app:textColor="#000000"
+        app:textSize="30sp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:textColor="#AAAAAA"
+        android:text="Select 6 Abilities"
+        android:fontFamily="@font/reliesta_display"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar1"
+            android:layout_width="160dp"
+            android:layout_height="80dp"
+            android:gravity="left"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Dark"
+            app:title="Ability 1"
+            app:titleTextColor="#AAAAAA"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"/>
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar2"
+            android:layout_width="160dp"
+            android:layout_height="80dp"
+            android:gravity="right"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Dark"
+            app:title="Ability 2"
+            app:titleTextColor="#AAAAAA"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar3"
+            android:layout_width="160dp"
+            android:layout_height="80dp"
+            android:gravity="left"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Dark"
+            app:title="Ability 3"
+            app:titleTextColor="#AAAAAA"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"/>
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar4"
+            android:layout_width="160dp"
+            android:layout_height="80dp"
+            android:gravity="right"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Dark"
+            app:title="Ability 4"
+            app:titleTextColor="#AAAAAA"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar5"
+            android:layout_width="160dp"
+            android:layout_height="80dp"
+            android:gravity="left"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Dark"
+            app:title="Ability 5"
+            app:titleTextColor="#AAAAAA"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"/>
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar6"
+            android:layout_width="160dp"
+            android:layout_height="80dp"
+            android:gravity="right"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Dark"
+            app:title="Ability 6"
+            app:titleTextColor="#AAAAAA"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"/>
+
+    </LinearLayout>
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/save_button"
+        android:layout_width="wrap_content"
+        android:layout_height="100dp"
+        app:buttonFont="@font/pine_forest"
+        app:buttonText="Save"
+        app:textColor="#000000"
+        app:textSize="70dp" />
+
+
+</LinearLayout>

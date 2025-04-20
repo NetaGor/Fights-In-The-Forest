@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Group 1"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:padding="8dp"
+        android:textColor="@android:color/white"/>
+
+    <ListView
+        android:id="@+id/group1_health_list"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_weight="1"
+        android:divider="@android:color/darker_gray"
+        android:dividerHeight="1dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Group 2"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:padding="8dp"
+        android:textColor="@android:color/white"/>
+
+    <ListView
+        android:id="@+id/group2_health_list"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_weight="1"
+        android:divider="@android:color/darker_gray"
+        android:dividerHeight="1dp"/>
+
+</LinearLayout>

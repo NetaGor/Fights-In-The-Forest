@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:background="@drawable/waiting_room"
+    tools:context=".MainActivity">
+
+    <ListView
+        android:layout_marginTop="100dp"
+        android:id="@+id/list_group1"
+        android:layout_width="wrap_content"
+        android:layout_height="150dp" />
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/join_group1"
+        android:layout_width="400dp"
+        android:layout_height="60dp"
+        app:buttonText="Join Group 1"
+        app:textColor="#000000"
+        app:textSize="40sp"
+        app:buttonFont="@font/pine_forest"
+        android:textSize="30sp" />
+
+    <ListView
+        android:id="@+id/list_group2"
+        android:layout_width="wrap_content"
+        android:layout_height="150dp" />
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/join_group2"
+        android:layout_width="400dp"
+        android:layout_height="60dp"
+        app:buttonText="Join Group 2"
+        app:textColor="#000000"
+        app:textSize="40sp"
+        app:buttonFont="@font/pine_forest"
+        android:textSize="30sp" />
+
+    <com.example.myproject.CustomButton
+        android:id="@+id/play"
+        android:layout_width="400dp"
+        android:layout_height="80dp"
+        app:buttonText="PLAY"
+        app:textColor="#000000"
+        app:textSize="60sp"
+        app:buttonFont="@font/pine_forest"
+        android:textSize="50sp" />
+
+    <TextView
+        android:id="@+id/code"
+        android:text="@string/room_code"
+        android:textColor="@color/black"
+        android:gravity="center"
+        android:layout_marginBottom="30dp"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:fontFamily="@font/pine_forest"
+        android:textSize="30sp"
+        android:padding="8dp"/>
+
+</LinearLayout>
