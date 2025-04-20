@@ -31,7 +31,6 @@ import traceback
 from flask_cors import CORS
 import json
 from HybridEncryption import HybridEncryption
-from DBEncryption import DBEncryption
 
 # Dictionary to track active game rooms and connected clients
 active_rooms = {}
@@ -73,8 +72,6 @@ print("Connected to Firebase Firestore")
 
 # Constants and configuration
 USERS_COLLECTION = "users"
-encryption_key = os.environ.get('DB_ENCRYPTION_KEY')
-db_encryption = DBEncryption(encryption_key)
 hybrid_encryption = HybridEncryption()
 
 #################################################
@@ -106,7 +103,7 @@ public_key = load_key("public.txt")
 # Retrieves a user's public key from the database with decryption
 def get_public_key(username):
     """
-    Retrieve a user's public key from the database with decryption
+    Retrieve a user's public key from the database without decryption
 
     Args:
         username (str): The username of the user
@@ -133,8 +130,8 @@ def get_public_key(username):
             print(f"No public key found for user {username}")
             return None
 
-        # Return the decrypted public key
-        return db_encryption.decrypt_field(user_doc['public_key'])
+        # Return the public key directly without decryption
+        return user_doc['public_key']
 
     except Exception as e:
         print(f"Error retrieving public key for {username}: {str(e)}")
@@ -247,42 +244,27 @@ def hash_password(password):
 # Encrypts sensitive fields in a character before database storage
 def encrypt_character(character):
     """
-    Encrypt sensitive fields in a character
+    Store character without encryption
 
     Args:
-        character (dict): Character data with sensitive fields
+        character (dict): Character data
 
     Returns:
-        dict: Character with encrypted sensitive fields
+        dict: Character without encryption
     """
-    encrypted = character.copy()
-    if "desc" in encrypted:
-        encrypted["desc"] = db_encryption.encrypt_field(encrypted["desc"])
-    if "abilities" in encrypted:
-        encrypted["abilities"] = db_encryption.encrypt_field(json.dumps(encrypted["abilities"]))
-    return encrypted
+    return character.copy()
 
 
 # Decrypts sensitive fields in a character after database retrieval
-def decrypt_character(encrypted_character):
+def decrypt_character(character):
     """
-    Decrypt sensitive fields in a character with error handling
+    Return character data without decryption
     """
-    if not encrypted_character:
-        return encrypted_character
+    if not character:
+        return character
 
-    character = encrypted_character.copy()
-    try:
-        if "desc" in character:
-            character["desc"] = db_encryption.decrypt_field(character["desc"])
-        if "abilities" in character:
-            character["abilities"] = json.loads(db_encryption.decrypt_field(character["abilities"]))
-    except Exception as e:
-        print(f"Decryption error for character: {character.get('name', 'unknown')}: {str(e)}")
-        character["desc"] = "Error: Could not decrypt description"
-        character["abilities"] = []
-
-    return character
+    # Simply return a copy of the character
+    return character.copy()
 
 
 # Verifies a password against its hashed version
@@ -299,10 +281,6 @@ def check_password(stored_hash, password):
     """
     return bcrypt.checkpw(password.encode(), stored_hash.encode())
 
-
-# Create cipher objects for encryption/decryption
-cipher_rsa_private = PKCS1_v1_5.new(private_key)
-cipher_rsa_public = PKCS1_v1_5.new(public_key)
 
 #################################################
 # USER AUTHENTICATION ROUTES
@@ -351,14 +329,14 @@ def register():
         # Hash password for security
         hashed_password = hash_password(password)
 
-        # Save user with encrypted sensitive fields
+        # Save user with encrypted password but unencrypted public key
         user_data = {
             'username': username,
             'password': hashed_password
         }
 
         if user_public_key:
-            user_data['public_key'] = db_encryption.encrypt_field(user_public_key)
+            user_data['public_key'] = user_public_key  # Store without encryption
 
         db.collection(USERS_COLLECTION).document(username).set(user_data)
 
@@ -444,7 +422,7 @@ def login():
         # If login successful and public key provided, update it in the database
         if user_public_key:
             db.collection(USERS_COLLECTION).document(username).update({
-                'public_key': db_encryption.encrypt_field(user_public_key)
+                'public_key': user_public_key  # Store without encryption
             })
 
         success_response = {"status": "success", "message": "Login successful."}
@@ -664,7 +642,7 @@ def generate_unique_character_id(username):
 @app.route("/save_character", methods=["POST"])
 def save_character():
     """
-    Save a new character or update an existing one.
+    Save a new character or update an existing one without encryption.
 
     Request format:
     {
@@ -722,9 +700,8 @@ def save_character():
                 return jsonify(encrypt_response(error_response, username)), 400
             characters[character_index] = character
 
-        # Encrypt characters before saving to database
-        encrypted_characters = [encrypt_character(char) for char in characters]
-        update_characters(username, encrypted_characters)
+        # No encryption needed
+        update_characters(username, characters)
 
         response_data = {"message": "Character saved successfully", "characters": characters}
         return jsonify(encrypt_response(response_data, username))
@@ -1893,55 +1870,29 @@ def get_group2():
 # Encrypts sensitive game state data before storage
 def encrypt_game_state(game_state):
     """
-    Encrypt sensitive game state data
+    No encryption needed for game state
 
     Args:
-        game_state (dict): The game state data to encrypt
+        game_state (dict): The game state data
 
     Returns:
-        dict: Encrypted game state with sensitive fields protected
+        dict: Game state without changes
     """
-    if not game_state:
-        return game_state
-
-    encrypted = game_state.copy()
-
-    # Encrypt character health data
-    if "character_health" in encrypted:
-        encrypted["character_health"] = db_encryption.encrypt_field(encrypted["character_health"])
-
-    # Encrypt chat log if it contains sensitive information
-    if "chat_log" in encrypted:
-        encrypted["chat_log"] = db_encryption.encrypt_field(encrypted["chat_log"])
-
-    return encrypted
+    return game_state.copy() if game_state else game_state
 
 
 # Decrypts game state data after retrieval from the database
-def decrypt_game_state(encrypted_state):
+def decrypt_game_state(game_state):
     """
-    Decrypt game state data
+    No decryption needed for game state
 
     Args:
-        encrypted_state (dict): The encrypted game state data
+        game_state (dict): The game state data
 
     Returns:
-        dict: Decrypted game state with readable fields
+        dict: Game state without changes
     """
-    if not encrypted_state:
-        return encrypted_state
-
-    state = encrypted_state.copy()
-
-    # Decrypt character health data
-    if "character_health" in state:
-        state["character_health"] = db_encryption.decrypt_field(state["character_health"])
-
-    # Decrypt chat log
-    if "chat_log" in state:
-        state["chat_log"] = db_encryption.decrypt_field(state["chat_log"])
-
-    return state
+    return game_state.copy() if game_state else game_state
 
 
 # Handles when the game has started socket event
@@ -2109,21 +2060,7 @@ def on_get_ability(data):
 @socketio.on('make_move')
 def on_make_move(data):
     """
-    Process a player's turn action.
-
-    Event data:
-    {
-        "username": string,
-        "ability": string,
-        "target": string,
-        "type": string (a/h for attack/heal),
-        "value": number,
-        "room_code": string,
-        "character": string
-    }
-
-    Updates health, chat log, and game state.
-    Checks for game end conditions and advances to next turn.
+    Process a player's turn action without encryption/decryption.
     """
     try:
         request_json = decrypt_request(data)
@@ -2140,13 +2077,13 @@ def on_make_move(data):
             error_response = {'error': 'Missing required fields'}
             return encrypt_response(error_response, username)
 
-            # Cancel the timer for this room
+        # Cancel the timer for this room
         if room_code in active_turn_timers:
             timer = active_turn_timers[room_code].get('timer')
             if timer:
                 timer.cancel()
 
-            # Get room data
+        # Get room data
         room_ref = db.collection('rooms').document(room_code)
         room_doc = room_ref.get()
 
@@ -2156,12 +2093,7 @@ def on_make_move(data):
 
         room_data = room_doc.to_dict()
 
-        # Decrypt any encrypted fields in room data
-        if 'character_health' in room_data:
-            room_data['character_health'] = db_encryption.decrypt_field(room_data['character_health'])
-
-        if 'chat_log' in room_data:
-            room_data['chat_log'] = db_encryption.decrypt_field(room_data['chat_log'])
+        # No decryption needed - character_health and chat_log are stored without encryption
 
         # Check if it's this player's turn
         current_turn = room_data['game_state']['turn']
@@ -2330,13 +2262,7 @@ def on_make_move(data):
                     encrypted_notification = encrypt_response(end_notification, client_username)
                     socketio.emit('game_ended', encrypted_notification, to=sid)
 
-        # Save updated room data
-        if 'character_health' in room_data:
-            room_data['character_health'] = db_encryption.encrypt_field(room_data['character_health'])
-
-        if 'chat_log' in room_data:
-            room_data['chat_log'] = db_encryption.encrypt_field(room_data['chat_log'])
-
+        # Save updated room data - no encryption needed
         room_ref.set(room_data)
 
         # If game not over, advance to next turn
@@ -2344,10 +2270,7 @@ def on_make_move(data):
             # Get the next players
             current_player, next_player = next_turn(room_code)
 
-            # For response, we need to use decrypted values
-            health_response = db_encryption.decrypt_field(room_data['character_health'])
-
-            # Notify clients about move and effects with decrypted data for display
+            # Notify clients about move and effects
             move_notification = {
                 'event': 'move_made',
                 'username': username,
@@ -2355,7 +2278,7 @@ def on_make_move(data):
                 'target': target,
                 'effect': effect_message,
                 'chat': chat_message,
-                'health': {target: health_response.get(target, 0)}
+                'health': {target: room_data['character_health'].get(target, 0)}
             }
 
             for client in active_rooms[room_code]:
@@ -2565,15 +2488,7 @@ def next_turn(room_code):
 @socketio.on('get_game_state')
 def on_get_game_state(data):
     """
-    Get the current game state for a player.
-
-    Event data:
-    {
-        "room_code": string,
-        "username": string
-    }
-
-    Returns game state including turn data, health, chat log, etc.
+    Get the current game state for a player without decryption.
     """
     try:
         request_json = decrypt_request(data)
@@ -2594,15 +2509,7 @@ def on_get_game_state(data):
 
         room_data = room_doc.to_dict()
 
-        # Decrypt any encrypted game state data
-        if 'game_state' in room_data:
-            room_data['game_state'] = decrypt_game_state(room_data['game_state'])
-
-        if 'character_health' in room_data:
-            room_data['character_health'] = db_encryption.decrypt_field(room_data['character_health'])
-
-        if 'chat_log' in room_data:
-            room_data['chat_log'] = db_encryption.decrypt_field(room_data['chat_log'])
+        # No decryption needed
 
         # Filter out just what we need for game state
         game_state = {
@@ -2638,15 +2545,7 @@ def on_get_game_state(data):
 @socketio.on('reconnect_to_game')
 def on_reconnect_to_game(data):
     """
-    Handles a player reconnecting to an ongoing game
-
-    Event data:
-    {
-        "username": string,
-        "room_code": string
-    }
-
-    Cancels disconnect timer if active and syncs game state to the reconnected player.
+    Handles a player reconnecting to an ongoing game without decryption
     """
     try:
         request_json = decrypt_request(data)
@@ -2718,7 +2617,7 @@ def on_reconnect_to_game(data):
                 'duration': 60
             }
 
-        # Prepare reconnection data with complete game state
+        # Prepare reconnection data with complete game state - no decryption needed
         reconnection_data = {
             'event': 'reconnection_sync',
             'current_player': current_player,
