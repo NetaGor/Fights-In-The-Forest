@@ -1,11 +1,3 @@
-package com.example.myproject;
-
-import android.app.Service;
-import android.content.Intent;
-import android.media.MediaPlayer;
-import android.os.IBinder;
-import androidx.annotation.Nullable;
-
 /**
  * A Service to handle background audio playback using MediaPlayer.
  * This service manages the lifecycle of audio playback and interfaces with MediaPlayer events.
@@ -18,6 +10,15 @@ import androidx.annotation.Nullable;
  * - OnBufferingUpdateListener: Provides buffering progress updates
  * - OnErrorListener: Handles errors during playback
  */
+
+package com.example.myproject;
+
+import android.app.Service;
+import android.content.Intent;
+import android.media.MediaPlayer;
+import android.os.IBinder;
+import androidx.annotation.Nullable;
+
 public class PlayService extends Service implements
         MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedListener,
         MediaPlayer.OnSeekCompleteListener, MediaPlayer.OnInfoListener,

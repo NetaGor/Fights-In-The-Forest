@@ -837,7 +837,7 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                                 JSONObject characterObject = charactersArray.getJSONObject(i);
                                 CharactersList character = new CharactersList(
                                         characterObject.getString("name"),
-                                        characterObject.getString("desc"),
+                                        characterObject.getString("username"),
                                         characterObject.getString("username")
                                 );
                                 newGroup1.add(character);
@@ -919,7 +919,7 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                                 JSONObject characterObject = charactersArray.getJSONObject(i);
                                 CharactersList character = new CharactersList(
                                         characterObject.getString("name"),
-                                        characterObject.getString("desc"),
+                                        characterObject.getString("username"),
                                         characterObject.getString("username")
                                 );
                                 newGroup2.add(character);

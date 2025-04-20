@@ -11,7 +11,8 @@
         android:id="@+id/character_name_edit_text"
         android:textColorHint="#888888"
         android:textColor="#AAAAAA"
-        android:fontFamily="@font/reliesta_display"        android:layout_width="match_parent"
+        android:fontFamily="@font/reliesta_display"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Character name" />
 

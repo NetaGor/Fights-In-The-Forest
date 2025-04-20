@@ -212,34 +212,54 @@ def decrypt_request(request_data):
         raise
 
 
-# Encrypts response data using the hybrid encryption system
-def encrypt_db(data):
+# Encrypts data to be stored in the database
+def encrypt_for_database(data):
     """
-    Encrypt response data using the hybrid encryption system
+    Encrypt sensitive data before storing in the database.
+    Uses symmetric encryption from HybridEncryption class.
 
     Args:
-        response_data (dict/str): The data to encrypt
-        username (str, optional): The username to determine the public key to use
+        data (dict/str): Data to encrypt
 
     Returns:
-        dict: The encrypted data in the appropriate format
+        dict: Encrypted data ready for database storage
     """
-    # Symmetric encryption
-    return hybrid_encryption.encrypt_symmetric(data)
+    try:
+        encrypted = hybrid_encryption.encrypt_symmetric(data)
+        # Extract only what we need for database storage
+        return {
+            "encrypted": True,
+            "data": encrypted["data"]
+        }
+    except Exception as e:
+        print(f"Error encrypting for database: {str(e)}")
+        traceback.print_exc()
+        # If encryption fails, return original data
+        return data
 
 
-# Decrypts request data using the hybrid encryption system
-def decrypt_db(data):
+# Decrypts data retrieved from the database
+def decrypt_from_database(encrypted_data):
     """
-    Decrypt request data using the hybrid encryption system
+    Decrypt data that was retrieved from the database.
 
     Args:
-        request_data (dict): The encrypted request data
+        encrypted_data (dict): Data retrieved from the database
 
     Returns:
-        dict/str: The decrypted data
+        dict/str: Decrypted data
     """
-    return hybrid_encryption.decrypt_symmetric(data)
+    try:
+        # Check if data is encrypted
+        if isinstance(encrypted_data, dict) and encrypted_data.get("encrypted", False):
+            return hybrid_encryption.decrypt_symmetric(encrypted_data)
+        # If not encrypted, return as is
+        return encrypted_data
+    except Exception as e:
+        print(f"Error decrypting from database: {str(e)}")
+        traceback.print_exc()
+        # If decryption fails, return original data
+        return encrypted_data
 
 
 # Checks if a username already exists in the database
@@ -538,7 +558,7 @@ def get_character():
 # Helper function to get all characters for a user and decrypt them
 def get_characters_func(username):
     """
-    Helper function to get all characters for a user.
+    Helper function to get all characters for a user with proper decryption.
 
     Args:
         username (str): The username to get characters for
@@ -550,37 +570,61 @@ def get_characters_func(username):
     collection_ref = user_ref.collection("characters")
     docs = collection_ref.stream()
 
-    # Get encrypted characters and decrypt them
+    # Get encrypted characters from database
     encrypted_characters = [doc.to_dict() for doc in docs]
-    return [char for char in encrypted_characters]
+
+    # Decrypt characters before returning
+    decrypted_characters = []
+    for char in encrypted_characters:
+        # If character data is encrypted
+        if isinstance(char, dict) and char.get("encrypted", False):
+            # Decrypt sensitive fields
+            decrypted_char = decrypt_from_database(char)
+            decrypted_characters.append(decrypted_char)
+        else:
+            # Handle case where character is not encrypted yet
+            decrypted_characters.append(char)
+
+    return decrypted_characters
 
 
 # Retrieves raw (encrypted) character data by name
 def get_character_func(username, name):
     """
-    Get raw (encrypted) character data from the database
+    Get character data from the database with proper decryption
 
     Args:
         username (str): The username to get the character for
         name (str): The character name to retrieve
 
     Returns:
-        dict: Raw character data with encrypted fields, or None if not found
+        dict: Decrypted character data, or None if not found
     """
     user_ref = db.collection(USERS_COLLECTION).document(username)
     collection_ref = user_ref.collection("characters")
     docs = collection_ref.stream()
+
     for doc in docs:
-        docdict = doc.to_dict()
-        if docdict['name'] == name:
-            return docdict
+        char_data = doc.to_dict()
+
+        # Check if character data is encrypted
+        if isinstance(char_data, dict) and char_data.get("encrypted", False):
+            # Decrypt to check the name
+            decrypted_char = decrypt_from_database(char_data)
+            if decrypted_char.get('name') == name:
+                return decrypted_char
+        else:
+            # Handle non-encrypted characters
+            if char_data.get('name') == name:
+                return char_data
+
     return None
 
 
 # Updates the characters collection for a user, handling adds/updates/deletes
 def update_characters(username, new_data):
     """
-    Update the characters collection for a user.
+    Update the characters collection for a user with encryption.
 
     This function handles adding, updating, and removing characters.
 
@@ -595,7 +639,14 @@ def update_characters(username, new_data):
     existing_characters = {}
     for doc in characters_ref.stream():
         char_data = doc.to_dict()
-        char_name = char_data.get('name')
+
+        # Decrypt character data to get name if needed
+        if isinstance(char_data, dict) and char_data.get("encrypted", False):
+            decrypted_char = decrypt_from_database(char_data)
+            char_name = decrypted_char.get('name')
+        else:
+            char_name = char_data.get('name')
+
         existing_characters[char_name] = {'id': doc.id, 'data': char_data}
 
     # Names from the updated data
@@ -605,13 +656,16 @@ def update_characters(username, new_data):
     for char in new_data:
         char_name = char.get('name')
 
+        # Encrypt character data before saving
+        encrypted_char = encrypt_for_database(char)
+
         if char_name in existing_characters:
             # Update existing character
             doc_id = existing_characters[char_name]['id']
-            characters_ref.document(doc_id).set(char)
+            characters_ref.document(doc_id).set(encrypted_char)
         else:
             # Add new character
-            characters_ref.add(char)
+            characters_ref.add(encrypted_char)
 
     # Handle deletions
     for char_name in existing_characters:
@@ -645,7 +699,7 @@ def generate_unique_character_id(username):
 @app.route("/save_character", methods=["POST"])
 def save_character():
     """
-    Save a new character or update an existing one without encryption.
+    Save a new character or update an existing one with encryption.
 
     Request format:
     {
@@ -675,8 +729,8 @@ def save_character():
 
         character = {
             "name": character_data["name"],
-            "desc": encrypt_db(character_data["desc"]),
-            "abilities": encrypt_db(character_data["abilities"]),
+            "desc": character_data["desc"],
+            "abilities": character_data["abilities"],
         }
 
         if character_index == -1:
@@ -703,7 +757,7 @@ def save_character():
                 return jsonify(encrypt_response(error_response, username)), 400
             characters[character_index] = character
 
-        # No encryption needed
+        # Update characters with encryption
         update_characters(username, characters)
 
         response_data = {"message": "Character saved successfully", "characters": characters}
@@ -714,70 +768,6 @@ def save_character():
         import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred saving character."}), 500
-
-
-# Updates specific fields of a character
-@app.route("/edit_character", methods=["POST"])
-def edit_character():
-    """
-    Edit specific fields of a character.
-
-    Request format:
-    {
-        "username": string,
-        "id": string,
-        "desc": string (optional),
-        "abilities": array (optional)
-    }
-
-    Response:
-    {
-        "message": string,
-        "characters": array
-    }
-    """
-    try:
-        data = request.get_json()
-        edit_data = decrypt_request(data)
-
-        username = edit_data.get("username")
-        character_id = edit_data.get("id")
-
-        if not username or not character_id:
-            error_response = {"error": "Missing username or character ID"}
-            return jsonify(encrypt_response(error_response, username)), 400
-
-        new_desc = encrypt_db(edit_data.get("desc"))
-        new_abilities = encrypt_db(edit_data.get("abilities"))
-
-        # Get decrypted characters
-        characters = get_characters_func(username)
-
-        character_found = False
-        for character in characters:
-            if character["id"] == character_id:
-                if new_desc:
-                    character["desc"] = new_desc
-                if new_abilities:
-                    character["abilities"] = new_abilities
-                character_found = True
-                break
-
-        if not character_found:
-            error_response = {"error": "Character not found"}
-            return jsonify(encrypt_response(error_response, username)), 404
-
-        # Saving character
-        update_characters(username, [char for char in characters])
-
-        response_data = {"message": "Character updated successfully", "characters": characters}
-        return jsonify(encrypt_response(response_data, username))
-
-    except Exception as e:
-        print(f"Error editing character: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"status": "error", "message": "An error occurred editing character."}), 500
 
 
 # Deletes a character by name
@@ -1025,6 +1015,7 @@ def on_join(data):
 def on_join_group(data):
     """
     Handle a player joining a group with consistent hybrid encryption.
+    Ensures sensitive data is properly encrypted in the database.
 
     Event data:
     {
@@ -1051,6 +1042,12 @@ def on_join_group(data):
         if room_doc.exists:
             room_data = room_doc.to_dict()
 
+            # Decrypt character_health if it's encrypted
+            character_health = room_data.get('character_health', {})
+            if isinstance(character_health, dict) and character_health.get("encrypted", False):
+                character_health = decrypt_from_database(character_health)
+                room_data['character_health'] = character_health
+
             # Track old character name before removing player from groups
             old_character_name = None
             # Remove player from other group if they exist, and remember their character
@@ -1076,6 +1073,9 @@ def on_join_group(data):
             # Set character health to default 50 if not already set
             if character_name not in room_data['character_health']:
                 room_data['character_health'][character_name] = 50
+
+            # Encrypt character_health before saving
+            room_data['character_health'] = encrypt_for_database(room_data['character_health'])
 
             room_ref.set(room_data)
 
@@ -1440,6 +1440,7 @@ def join_room_route():
 def create_room():
     """
     Create a new game room with a unique code.
+    Implements encryption for sensitive fields.
 
     Request format:
     {
@@ -1452,7 +1453,7 @@ def create_room():
     }
 
     Generates a unique 4-digit room code and initializes
-    the room structure in Firebase.
+    the room structure in Firebase with encrypted fields.
     """
     try:
         data = request.get_json()
@@ -1466,6 +1467,9 @@ def create_room():
         # Generate unique room code
         room_code = generate_room_code()
 
+        # Encrypt character_health for initial storage
+        character_health = encrypt_for_database({})
+
         # Initialize room structure
         room_ref = db.collection('rooms').document(room_code)
         room_ref.set({
@@ -1474,7 +1478,7 @@ def create_room():
             'group1': {},
             'group2': {},
             'ready_players': [],
-            'character_health': {},  # Initialize empty character health dictionary
+            'character_health': character_health,  # Store encrypted empty dictionary
             'game_state': {
                 'status': 'not started',
                 'turn': 1,
@@ -1575,46 +1579,11 @@ def remove_player_from_room():
         return jsonify({"status": "error", "message": "An error occurred removing player from room."}), 500
 
 
-# Retrieves all data for a specific room
-@app.route('/get_room_data', methods=['POST'])
-def get_room_data():
-    try:
-        data = request.get_json()
-        request_json = decrypt_request(data)
-
-        room_code = request_json.get('room_code')
-        username = request_json.get('username')
-
-        room_ref = db.collection('rooms').document(room_code)
-        room_doc = room_ref.get()
-
-        if not room_doc.exists:
-            error_response = {'error': 'Room not found'}
-            return jsonify(encrypt_response(error_response, username)), 404
-
-        room_data = room_doc.to_dict()
-
-        # Decrypt chat log if it exists
-        if 'chat_log' in room_data and room_data['chat_log']:
-            chat_log = []
-            for chat_entry in room_data['chat_log']:
-                chat_log.append(chat_entry)
-            room_data['chat_log'] = chat_log
-
-        response_data = {'data': room_data}
-        return jsonify(encrypt_response(response_data, username))
-
-    except Exception as e:
-        print(f"Error getting room data: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"status": "error", "message": "An error occurred getting room data."}), 500
-
-
 # Checks if all players are ready and starts the game if conditions are met
 def check_all_ready(room_data, room_code):
     """
     Checks if all players are ready and starts the game if conditions are met.
+    Handles encrypted fields appropriately.
 
     Args:
         room_data (dict): The current room data
@@ -1653,6 +1622,14 @@ def check_all_ready(room_data, room_code):
     player_list = list(room_data['players'])
     random.shuffle(player_list)
     room_data['game_state']['player_order'] = player_list
+
+    # Make sure character_health is encrypted
+    if 'character_health' in room_data:
+        if not (isinstance(room_data['character_health'], dict) and room_data['character_health'].get("encrypted",
+                                                                                                      False)):
+            room_data['character_health'] = encrypt_for_database(room_data['character_health'])
+
+    # Save the room data
     room_ref.set(room_data)
 
     # Emit game_started event to all clients in the room
@@ -1859,35 +1836,6 @@ def get_group2():
 #################################################
 # GAMEPLAY ROUTES AND FUNCTIONS
 #################################################
-
-# Encrypts sensitive game state data before storage
-def encrypt_game_state(game_state):
-    """
-    No encryption needed for game state
-
-    Args:
-        game_state (dict): The game state data
-
-    Returns:
-        dict: Game state without changes
-    """
-    return game_state.copy() if game_state else game_state
-
-
-# Decrypts game state data after retrieval from the database
-def decrypt_game_state(game_state):
-    """
-    No decryption needed for game state
-
-    Args:
-        game_state (dict): The game state data
-
-    Returns:
-        dict: Game state without changes
-    """
-    return game_state.copy() if game_state else game_state
-
-
 # Handles when the game has started socket event
 @socketio.on('game_started')
 def on_game_started(data):
@@ -1915,7 +1863,7 @@ def on_game_started(data):
 # Initializes the first turn of the game
 def start_first_turn(room_code):
     """
-    Start the first turn of the game.
+    Start the first turn of the game with proper handling of encrypted data.
 
     Args:
         room_code (str): The room code to start the game for
@@ -2051,7 +1999,7 @@ def on_get_ability(data):
 @socketio.on('make_move')
 def on_make_move(data):
     """
-    Process a player's turn action without encryption/decryption.
+    Process a player's turn action with proper encryption for database storage.
     """
     try:
         request_json = decrypt_request(data)
@@ -2084,7 +2032,12 @@ def on_make_move(data):
 
         room_data = room_doc.to_dict()
 
-        # No decryption needed - character_health and chat_log are stored without encryption
+        # Decrypt character_health if it's encrypted
+        character_health = room_data.get('character_health', {})
+        if isinstance(character_health, dict) and character_health.get("encrypted", False):
+            character_health = decrypt_from_database(character_health)
+            room_data['character_health'] = character_health
+
 
         # Check if it's this player's turn
         current_turn = room_data['game_state']['turn']
@@ -2156,40 +2109,46 @@ def on_make_move(data):
         if 'chat_log' not in room_data:
             room_data['chat_log'] = []
 
+        # Create chat entry and always encrypt it
         chat_entry = {
             'message': chat_message,
             'effect': effect_message,
             'turn': current_turn
         }
-        # Encrypt the entire chat entry
-        room_data['chat_log'].append(chat_entry)
 
-        # Check if target died
+        # Always encrypt the chat entry before storing
+        encrypted_chat_entry = encrypt_for_database(chat_entry)
+        room_data['chat_log'].append(encrypted_chat_entry)
+
+        # Check if target died - also encrypt this message
         if new_health <= 0:
-            room_data['chat_log'].append({
+            defeat_entry = {
                 'message': f"{target} has been defeated!",
                 'turn': current_turn
-            })
+            }
+            # Always encrypt the defeat message
+            encrypted_defeat_entry = encrypt_for_database(defeat_entry)
+            room_data['chat_log'].append(encrypted_defeat_entry)
 
         # Check if game is over (all players in a group defeated)
         group1_all_dead = True
         group2_all_dead = True
 
-        for character in room_data.get('character_health', {}):
+        for character_name in room_data.get('character_health', {}):
             # Determine which group this character belongs to
             char_group = None
             for player_username, char_name in room_data.get('group1', {}).items():
-                if char_name == character:
+                if char_name == character_name:
                     char_group = 'group1'
                     break
 
             if char_group is None:
                 for player_username, char_name in room_data.get('group2', {}).items():
-                    if char_name == character:
+                    if char_name == character_name:
                         char_group = 'group2'
                         break
 
-            health = room_data['character_health'][character]
+            health = room_data['character_health'][character_name]
             if health > 0:
                 if char_group == 'group1':
                     group1_all_dead = False
@@ -2206,22 +2165,22 @@ def on_make_move(data):
         elif group2_all_dead:
             game_over = True
             winner = 'group1'
-        elif current_turn >= len(room_data['character_health']) * 15:  # Round limit (10 rounds)
+        elif current_turn >= len(room_data['character_health']) * 15:  # Round limit (15 rounds)
             game_over = True
             # Determine winner based on total remaining health
             group1_health = 0
             group2_health = 0
 
-            for character, health in room_data['character_health'].items():
+            for character_name, health in room_data['character_health'].items():
                 char_group = None
                 for player_username, char_name in room_data.get('group1', {}).items():
-                    if char_name == character:
+                    if char_name == character_name:
                         char_group = 'group1'
                         break
 
                 if char_group is None:
                     for player_username, char_name in room_data.get('group2', {}).items():
-                        if char_name == character:
+                        if char_name == character_name:
                             char_group = 'group2'
                             break
 
@@ -2238,6 +2197,14 @@ def on_make_move(data):
                 winner = 'tie'
 
         if game_over:
+            # Create and encrypt game end message
+            end_message = {
+                'message': f"Game over! Winner: {winner}",
+                'turn': current_turn
+            }
+            encrypted_end_message = encrypt_for_database(end_message)
+            room_data['chat_log'].append(encrypted_end_message)
+
             room_data['game_state']['status'] = 'ended'
             room_data['game_state']['winner'] = winner
 
@@ -2255,7 +2222,10 @@ def on_make_move(data):
                     encrypted_notification = encrypt_response(end_notification, client_username)
                     socketio.emit('game_ended', encrypted_notification, to=sid)
 
-        # Save updated room data - no encryption needed
+        # Encrypt character_health before storing
+        room_data['character_health'] = encrypt_for_database(room_data['character_health'])
+
+        # Save updated room data
         room_ref.set(room_data)
 
         # If game not over, advance to next turn
@@ -2271,7 +2241,7 @@ def on_make_move(data):
                 'target': target,
                 'effect': effect_message,
                 'chat': chat_message,
-                'health': {target: room_data['character_health'].get(target, 0)}
+                'health': {target: new_health}  # Send decrypted health value
             }
 
             for client in active_rooms[room_code]:
@@ -2300,7 +2270,7 @@ def on_make_move(data):
 @socketio.on('skip_turn')
 def on_skip_turn(data):
     """
-    Process a player skipping their turn.
+    Process a player skipping their turn with proper encryption for database storage.
 
     Event data:
     {
@@ -2312,7 +2282,6 @@ def on_skip_turn(data):
     """
     try:
         request_json = decrypt_request(data)
-        print("!!!!!!!!!!!!!")
         username = request_json.get('username')
         room_code = request_json.get('room_code')
 
@@ -2333,9 +2302,26 @@ def on_skip_turn(data):
         if not room_doc.exists:
             error_response = {'error': 'Room not found'}
             return encrypt_response(error_response, username)
-        print("!!!!!!!!!!!!!")
+
         room_data = room_doc.to_dict()
-        print("!!!!!!!!!!!!!")
+
+        # Decrypt character_health if it's encrypted
+        character_health = room_data.get('character_health', {})
+        if isinstance(character_health, dict) and character_health.get("encrypted", False):
+            character_health = decrypt_from_database(character_health)
+            room_data['character_health'] = character_health
+
+        # Decrypt chat_log if it exists and is encrypted
+        if 'chat_log' in room_data:
+            chat_log = []
+            for entry in room_data['chat_log']:
+                if isinstance(entry, dict) and entry.get("encrypted", False):
+                    decrypted_entry = decrypt_from_database(entry)
+                    chat_log.append(decrypted_entry)
+                else:
+                    chat_log.append(entry)
+            room_data['chat_log'] = chat_log
+
         # Check if it's this player's turn
         current_turn = room_data['game_state']['turn']
         player_order = room_data['game_state']['player_order']
@@ -2343,15 +2329,29 @@ def on_skip_turn(data):
         if not player_order:
             error_response = {'error': 'No players in game order'}
             return encrypt_response(error_response, username)
-        print("!!!!!!!!!!!!!")
+
         current_player = player_order[current_turn % len(player_order)]
 
         if current_player != username:
             error_response = {'error': 'Not your turn'}
             return encrypt_response(error_response, username)
-        print("!!!!!!!!!!!!!")
-        # Check if round limit reached
+
+        # Add skip entry to chat log
+        if 'chat_log' not in room_data:
+            room_data['chat_log'] = []
+
+        skip_entry = {
+            'message': f"{username} skipped their turn",
+            'turn': current_turn
+        }
+
+        # Encrypt the skip entry
+        encrypted_skip_entry = encrypt_for_database(skip_entry)
+        room_data['chat_log'].append(encrypted_skip_entry)
+
+        # Check for round limit/game end condition
         game_over = False
+        winner = None
 
         if current_turn >= 10:  # Round limit (10 rounds)
             game_over = True
@@ -2385,6 +2385,14 @@ def on_skip_turn(data):
                 winner = 'tie'
 
             if game_over:
+                # Add encrypted game end message
+                end_message = {
+                    'message': f"Game over! Winner: {winner}",
+                    'turn': current_turn
+                }
+                encrypted_end_message = encrypt_for_database(end_message)
+                room_data['chat_log'].append(encrypted_end_message)
+
                 room_data['game_state']['status'] = 'ended'
                 room_data['game_state']['winner'] = winner
 
@@ -2401,7 +2409,9 @@ def on_skip_turn(data):
                     if client_username and sid:
                         encrypted_notification = encrypt_response(end_notification, client_username)
                         socketio.emit('game_ended', encrypted_notification, to=sid)
-        print("!!!!!!!!!!!!!")
+
+        # Encrypt character health before saving
+        room_data['character_health'] = encrypt_for_database(room_data['character_health'])
 
         # Save updated room data
         room_ref.set(room_data)
@@ -2411,8 +2421,8 @@ def on_skip_turn(data):
             # Get the next players
             current_player, next_player = next_turn(room_code)
 
-            # Notify clients about move and effects
-            move_notification = {
+            # Notify clients about skip
+            skip_notification = {
                 'event': 'skip_made',
                 'username': username,
             }
@@ -2422,7 +2432,7 @@ def on_skip_turn(data):
                 sid = client.get("sid")
 
                 if client_username and sid:
-                    encrypted_notification = encrypt_response(move_notification, client_username)
+                    encrypted_notification = encrypt_response(skip_notification, client_username)
                     socketio.emit('move_made', encrypted_notification, to=sid)
 
             # Start the next turn's timer
@@ -2430,20 +2440,19 @@ def on_skip_turn(data):
 
         # Prepare response
         response_data = {'success': True}
-        print("!!!!!!!!!!!!!")
         return encrypt_response(response_data, username)
 
     except Exception as e:
-        print(f"Error making move: {str(e)}")
+        print(f"Error skipping turn: {str(e)}")
         traceback.print_exc()
-        error_response = {'error': f'Error making move: {str(e)}'}
+        error_response = {'error': f'Error skipping turn: {str(e)}'}
         return encrypt_response(error_response, username) if username else error_response
 
 
 # Advances to the next turn in the game
 def next_turn(room_code):
     """
-    Advance to the next turn in the game.
+    Advance to the next turn in the game with proper handling of encrypted data.
 
     Args:
         room_code (str): The room code
@@ -2463,6 +2472,13 @@ def next_turn(room_code):
         return None, None
 
     room_data['game_state']['turn'] += 1
+
+    # Encrypt any sensitive data before saving
+    if 'character_health' in room_data:
+        if not (isinstance(room_data['character_health'], dict) and room_data['character_health'].get("encrypted",
+                                                                                                      False)):
+            room_data['character_health'] = encrypt_for_database(room_data['character_health'])
+
     room_ref.set(room_data)
 
     current_turn = room_data['game_state']['turn']
@@ -2480,6 +2496,17 @@ def next_turn(room_code):
 # Returns the current game state to a player
 @socketio.on('get_game_state')
 def on_get_game_state(data):
+    """
+    Returns the current game state with proper decryption of sensitive data.
+
+    Event data:
+    {
+        "room_code": string,
+        "username": string
+    }
+
+    Returns properly decrypted game state information.
+    """
     try:
         request_json = decrypt_request(data)
 
@@ -2499,13 +2526,24 @@ def on_get_game_state(data):
 
         room_data = room_doc.to_dict()
 
-        # Get the chat log and decrypt it
+        # Decrypt character_health if needed
+        character_health = room_data.get('character_health', {})
+        if isinstance(character_health, dict) and character_health.get("encrypted", False):
+            character_health = decrypt_from_database(character_health)
+        else:
+            character_health = room_data.get('character_health', {})
+
+        # Get the chat log and decrypt it if needed
         chat_log = []
         if 'chat_log' in room_data and room_data['chat_log']:
             # Get the last 10 messages
             recent_chat = room_data['chat_log'][-10:]
             for chat_entry in recent_chat:
-                chat_log.append(chat_entry)
+                if isinstance(chat_entry, dict) and chat_entry.get("encrypted", False):
+                    decrypted_entry = decrypt_from_database(chat_entry)
+                    chat_log.append(decrypted_entry)
+                else:
+                    chat_log.append(chat_entry)
 
         # Filter out just what we need for game state
         game_state = {
@@ -2513,8 +2551,8 @@ def on_get_game_state(data):
             'turn': room_data.get('game_state', {}).get('turn', 0),
             'current_player': None,
             'next_player': None,
-            'character_health': room_data.get('character_health', {}),
-            'chat_log': chat_log,  # Use decrypted chat log
+            'character_health': character_health,
+            'chat_log': chat_log,
             'group1': room_data.get('group1', {}),
             'group2': room_data.get('group2', {})
         }
@@ -2542,7 +2580,7 @@ def on_get_game_state(data):
 @socketio.on('reconnect_to_game')
 def on_reconnect_to_game(data):
     """
-    Handles a player reconnecting to an ongoing game without decryption
+    Handles a player reconnecting to an ongoing game with proper decryption.
     """
     try:
         request_json = decrypt_request(data)
@@ -2614,23 +2652,34 @@ def on_reconnect_to_game(data):
                 'duration': 60
             }
 
-            # Decrypt chat log for reconnection sync
+        # Decrypt character_health if needed
+        character_health = room_data.get('character_health', {})
+        if isinstance(character_health, dict) and character_health.get("encrypted", False):
+            character_health = decrypt_from_database(character_health)
+        else:
+            character_health = room_data.get('character_health', {})
+
+        # Decrypt chat log for reconnection sync
         chat_log = []
         if 'chat_log' in room_data and room_data['chat_log']:
             # Get the last 10 messages
             recent_chat = room_data['chat_log'][-10:]
             for chat_entry in recent_chat:
-                chat_log.append(chat_entry)
+                if isinstance(chat_entry, dict) and chat_entry.get("encrypted", False):
+                    decrypted_entry = decrypt_from_database(chat_entry)
+                    chat_log.append(decrypted_entry)
+                else:
+                    chat_log.append(chat_entry)
 
         # Prepare reconnection data with complete game state
         reconnection_data = {
             'event': 'reconnection_sync',
             'current_player': current_player,
             'next_player': next_player,
-            'character_health': room_data.get('character_health', {}),
+            'character_health': character_health,
             'group1': room_data.get('group1', {}),
             'group2': room_data.get('group2', {}),
-            'chat_log': chat_log,  # Use decrypted chat log
+            'chat_log': chat_log,
             'turn_timer': turn_timer_info,
             'game_status': status,
             'turn': current_turn
@@ -2654,7 +2703,6 @@ def on_reconnect_to_game(data):
     except Exception as e:
         print(f"Error in reconnect_to_game handler: {str(e)}")
         traceback.print_exc()
-
 
 # Main application entry point
 if __name__ == '__main__':
