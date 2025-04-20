@@ -426,13 +426,9 @@ def login():
 
         user_data = query[0].to_dict()
 
-        # Decrypt the stored password
-        stored_password_enc = user_data.get("password", "")
-        hashed_pass = hash_password(password)
-        # Check password
+        stored_password = user_data.get("password", "")
 
-
-        if hashed_pass != stored_password_enc:
+        if not check_password(stored_password, password):
             error_response = {"status": "error", "message": "Invalid password."}
             # Try to encrypt with the provided public key
             if user_public_key:

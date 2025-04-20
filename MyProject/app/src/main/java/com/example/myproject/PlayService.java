@@ -54,17 +54,14 @@ public class PlayService extends Service implements
      */
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        String link = intent.getStringExtra("link");
         mediaPlayer.reset();
 
         if (!mediaPlayer.isPlaying()) {
-            try {
-                mediaPlayer.setDataSource(link);
-                mediaPlayer.prepareAsync();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            mediaPlayer = MediaPlayer.create(this, R.raw.combat_music);
+            mediaPlayer.setLooping(true);
+            mediaPlayer.start();
         }
+
         return START_STICKY;
     }
 
