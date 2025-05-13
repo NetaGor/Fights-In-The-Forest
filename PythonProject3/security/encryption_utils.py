@@ -20,7 +20,7 @@ from config import db, USERS_COLLECTION
 hybrid_encryption = HybridEncryption()
 
 def load_key(file_path):
-    """Load an RSA key from a base64 encoded file."""
+    """Loads an RSA key from a base64 encoded file."""
     with open(file_path, "r") as file:
         base64_key = file.read().strip()
         decoded_key = base64.b64decode(base64_key)
@@ -32,7 +32,7 @@ public_key = load_key("raw/public.txt")
 
 
 def get_public_key(username):
-    """Retrieve a user's public key from the database."""
+    """Retrieves a user's public key from the database for encryption."""
     try:
         if username is None:
             return None
@@ -49,25 +49,25 @@ def get_public_key(username):
 
         return user_doc['public_key']
 
-    except Exception as e:
+    except Exception:
         return None
 
 
 def encrypt_response(response_data, username=None):
-    """Encrypt response data using hybrid encryption system."""
+    """Encrypts response data using the user's public key or symmetric encryption as fallback."""
     if username:
         user_public_key = get_public_key(username)
         if user_public_key:
             try:
                 return hybrid_encryption.encrypt_with_public_key(response_data, user_public_key)
-            except Exception as e:
+            except Exception:
                 raise
 
     return hybrid_encryption.encrypt_symmetric(response_data)
 
 
 def decrypt_request(request_data):
-    """Decrypt request data using hybrid encryption system."""
+    """Decrypts incoming request data using appropriate decryption method."""
     try:
         method = request_data.get("method", "")
 
@@ -77,7 +77,7 @@ def decrypt_request(request_data):
             encrypted_data = request_data.get("data")
 
             if not all([encrypted_key, iv, encrypted_data]):
-                raise ValueError("Missing required encryption parameters")
+                raise
 
             decrypted_data = hybrid_encryption.decrypt_hybrid_request(
                 encrypted_key, iv, encrypted_data, private_key
@@ -88,51 +88,50 @@ def decrypt_request(request_data):
             except json.JSONDecodeError:
                 return decrypted_data
 
-        elif "data" in request_data and request_data.get("encrypted", False):
+        elif "data" in request_data and request_data.get("encrypted", True):
             return hybrid_encryption.decrypt_symmetric(request_data)
 
         return request_data
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        raise
 
 
 def encrypt_for_database(data):
-    """Encrypt sensitive data before storing in the database."""
+    """Encrypts sensitive data before storing it in the database."""
     try:
         encrypted = hybrid_encryption.encrypt_symmetric(data)
         return {
             "encrypted": True,
             "data": encrypted["data"]
         }
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return data
 
 
 def decrypt_from_database(encrypted_data):
-    """Decrypt data retrieved from the database."""
+    """Decrypts data retrieved from the database for processing."""
     try:
-        if isinstance(encrypted_data, dict) and encrypted_data.get("encrypted", False):
+        if isinstance(encrypted_data, dict) and encrypted_data.get("encrypted", True):
             return hybrid_encryption.decrypt_symmetric(encrypted_data)
         return encrypted_data
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return encrypted_data
 
 
 def hash_password(password):
-    """Hash a password using bcrypt."""
+    """Securely hashes a password using bcrypt with salt."""
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def check_password(stored_hash, password):
-    """Verify a password against its hash."""
+    """Verifies a password against its stored hash."""
     return bcrypt.checkpw(password.encode(), stored_hash.encode())
 
 
 def user_exists(username):
-    """Check if a username already exists in the database."""
+    """Checks if a username already exists in the database."""
     query = db.collection(USERS_COLLECTION).where('username', '==', username).get()
     return len(query) > 0

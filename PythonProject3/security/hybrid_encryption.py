@@ -61,7 +61,7 @@ class HybridEncryption:
             cipher_rsa = PKCS1_v1_5.new(public_key)
             encrypted_key = cipher_rsa.encrypt(aes_key)
 
-            # Base64 encode everything for transmission
+            # Base64 encode everything for transmission and add encryption method identifier
             return {
                 "encrypted": True,
                 "method": "hybrid-rsa-aes",
@@ -70,9 +70,8 @@ class HybridEncryption:
                 "data": base64.b64encode(encrypted_data).decode('utf-8')
             }
 
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
-
             # Fall back to symmetric encryption
             return self.encrypt_symmetric(data)
 
@@ -86,7 +85,7 @@ class HybridEncryption:
 
             # Decrypt the AES key with the server's private RSA key
             cipher_rsa = PKCS1_v1_5.new(private_key)
-            sentinel = get_random_bytes(16)  # Value returned if decryption fails
+            sentinel = get_random_bytes(16)
             aes_key = cipher_rsa.decrypt(encrypted_key, sentinel)
 
             if aes_key == sentinel:
@@ -102,12 +101,11 @@ class HybridEncryption:
             # Return the decrypted data as a string
             return decrypted_data.decode('utf-8')
 
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
-            raise
 
     def encrypt_symmetric(self, data):
-        """Provides symmetric encryption as a fallback when RSA is unavailable."""
+        """Encrypts data with symmetric AES."""
         try:
             # Convert to JSON string if it's a dictionary
             if isinstance(data, dict):
@@ -134,7 +132,7 @@ class HybridEncryption:
                 "data": encoded_data
             }
 
-        except Exception as e:
+        except Exception:
             return {"error": "Encryption failed"}
 
     def decrypt_symmetric(self, encrypted_data):
@@ -143,7 +141,7 @@ class HybridEncryption:
             # Handle different input formats
             if isinstance(encrypted_data, dict):
                 if "data" not in encrypted_data:
-                    raise ValueError("Invalid encrypted data format")
+                    raise
                 data = encrypted_data["data"]
             else:
                 data = encrypted_data
@@ -163,5 +161,5 @@ class HybridEncryption:
 
             return json.loads(decrypted_str)
 
-        except Exception as e:
+        except Exception:
             raise
