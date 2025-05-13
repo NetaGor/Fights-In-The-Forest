@@ -1,13 +1,9 @@
 /**
- * WaitingRoom Activity
+ * WaitingRoom - Game lobby
  *
- * This activity serves as a lobby where players can join teams, select characters,
- * and prepare before the actual gameplay begins. It manages team formation, character selection,
- * and real-time synchronization between all players using WebSockets.
- *
- * Communication with the server is secured using hybrid encryption (RSA + AES).
+ * Players join teams, select characters, and prepare for battle.
+ * Manages real-time team sync via WebSocket and encrypted communication.
  */
-
 package com.example.myproject;
 
 import android.annotation.SuppressLint;
@@ -42,24 +38,18 @@ import io.socket.emitter.Emitter;
 import okhttp3.*;
 
 public class WaitingRoom extends AppCompatActivity implements View.OnClickListener {
-    private static final String TAG = "WaitingRoom";
-    private static final String SERVER_URL = "http://10.0.2.2:8080";
-
-    // UI Components
     private ListView listRoomGroup1, listRoomGroup2;
     private TextView room_code_display;
     private CustomButton playButton, joinGroup1Button, joinGroup2Button;
 
-    // Data Management
+    private static final String TAG = "WaitingRoom";
+    private static final String SERVER_URL = "http://10.0.2.2:8080";
+
     static List<CharactersList> myCharacters = new ArrayList<>();
     static List<CharactersList> group1 = new ArrayList<>();
     static List<CharactersList> group2 = new ArrayList<>();
     private CharactersListAdapter characterAdapterGroup1, characterAdapterGroup2;
 
-    // WebSocket Connection
-    private Socket mSocket;
-
-    // Game State
     private String currentPlayerCharacter = null;
     private String currentGroup = null;
     private String username, room_code;
@@ -67,45 +57,26 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
     private boolean isTransitioningToGameplay = false;
     private AlertDialog countdownDialog;
 
-    // Network Components
     private RSAEncryption rsaEncryption;
     private HybridEncryption hybridEncryption;
     private OkHttpClient client;
-    private KeyPair keyPair;
     private RSAPrivateKey privateKey;
     private AlertDialog loadingDialog;
+    private Socket mSocket;
 
-    /**
-     * Initializes the waiting room activity when it is first created.
-     *
-     * This method performs the following tasks:
-     * - Sets up the activity layout and initializes UI components
-     * - Retrieves room code and username information from intent and shared preferences
-     * - Initializes RSA and hybrid encryption systems
-     * - Loads private key for encryption; returns to MainActivity if encryption setup fails
-     * - Establishes or reuses WebSocket connection through GlobalSocketManager
-     * - Sets up socket event listeners and joins the room
-     * - Initializes adapters and loads group data
-     * - Loads available characters for selection
-     *
-     * @param savedInstanceState Bundle containing the activity's previously saved state, if any
-     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.waiting_room);
 
-        // Initialize components
         client = new OkHttpClient();
         initializeUIComponents();
 
-        // Get room and user details
         room_code = getIntent().getStringExtra("room_code");
 
         SharedPreferences prefs = getSharedPreferences("Current_Connection", MODE_PRIVATE);
         username = prefs.getString("username", "");
 
-        // Initialize encryption
         rsaEncryption = new RSAEncryption(getApplicationContext());
         hybridEncryption = new HybridEncryption(getApplicationContext());
 
@@ -120,32 +91,22 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             Toast.makeText(this, "Error loading encryption keys: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
 
-        // Check if there's a socket in the manager first
         if (GlobalSocketManager.getSocket() != null) {
             mSocket = GlobalSocketManager.getSocket();
-            // Add event listeners
             setupSocketListeners();
-            // Join room with existing socket
             joinRoom();
         } else {
-            // Create a new socket if none exists
             setupWebSocket();
         }
 
-        // Set room code display
         room_code_display.setText("Room Code: " + room_code);
 
-        // Initialize adapters
         initializeAdapters();
         refreshGroupsData();
 
-        // Load characters
         loadCharacters();
     }
 
-    /**
-     * Initializes UI components and sets up click listeners for buttons.
-     */
     private void initializeUIComponents() {
         listRoomGroup1 = findViewById(R.id.list_group1);
         listRoomGroup2 = findViewById(R.id.list_group2);
@@ -154,14 +115,11 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         joinGroup1Button = findViewById(R.id.join_group1);
         joinGroup2Button = findViewById(R.id.join_group2);
 
-        // Set click listeners
         joinGroup1Button.setOnClickListener(this);
         joinGroup2Button.setOnClickListener(this);
         playButton.setOnClickListener(this);
     }
-    /**
-     * Initializes list adapters for both character groups.
-     */
+
     private void initializeAdapters() {
         characterAdapterGroup1 = new CharactersListAdapter(this, group1);
         listRoomGroup1.setAdapter(characterAdapterGroup1);
@@ -169,9 +127,7 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         characterAdapterGroup2 = new CharactersListAdapter(this, group2);
         listRoomGroup2.setAdapter(characterAdapterGroup2);
     }
-    /**
-     * Sets up all socket event listeners for real-time communication.
-     */
+
     private void setupSocketListeners() {
         mSocket.on("new_player", onNewPlayer);
         mSocket.on("group_change", onGroupChange);
@@ -180,23 +136,19 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         mSocket.on("game_started", onGameStarted);
         mSocket.on("validate_connection", onValidateConnection);
         mSocket.on("game_start_failed", onGameStartFailed);
+        mSocket.on("update", onUpdate);
     }
-    /**
-     * Configures and establishes WebSocket connection with server.
-     */
+
     private void setupWebSocket() {
         try {
-            // Configure Socket.IO connection options
             IO.Options opts = new IO.Options();
             opts.forceNew = true;
             opts.reconnection = true;
             opts.reconnectionAttempts = 10;
             opts.reconnectionDelay = 1000;
 
-            // Create socket connection
             mSocket = IO.socket(SERVER_URL, opts);
 
-            // Connection event listeners
             mSocket.on(Socket.EVENT_CONNECT, new Emitter.Listener() {
                 @Override
                 public void call(Object... args) {
@@ -207,10 +159,8 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 }
             });
 
-            // Setup all event listeners
             setupSocketListeners();
 
-            // Connect to WebSocket
             mSocket.connect();
 
         } catch (URISyntaxException e) {
@@ -219,10 +169,7 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         }
     }
 
-    // WebSocket Event Listeners
-    /**
-     * WebSocket event listener that handles when a new player joins the room.
-     */
+    /** Handle new player joining room */
     private Emitter.Listener onNewPlayer = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
@@ -230,7 +177,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 try {
                     JSONObject encryptedData = (JSONObject) args[0];
 
-                    // Decrypt the incoming data using hybrid decryption
                     String method = encryptedData.optString("method", "");
                     Object decryptedData;
 
@@ -255,9 +201,8 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             });
         }
     };
-    /**
-     * WebSocket event listener that processes player group changes.
-     */
+
+    /** Handle player changing groups */
     private Emitter.Listener onGroupChange = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
@@ -265,7 +210,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 try {
                     JSONObject encryptedData = (JSONObject) args[0];
 
-                    // Decrypt the incoming data using hybrid decryption
                     String method = encryptedData.optString("method", "");
                     Object decryptedData;
 
@@ -286,10 +230,8 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                     String characterName = data.getString("character_name");
                     String group = data.getString("group");
 
-                    // Update group lists
                     refreshGroupsData();
 
-                    // Notify adapters
                     if (group.equals("group1")) {
                         characterAdapterGroup1.notifyDataSetChanged();
                     } else {
@@ -302,9 +244,8 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             });
         }
     };
-    /**
-     * WebSocket event listener that handles when a player indicates they are ready.
-     */
+
+    /** Handle player ready status */
     private Emitter.Listener onPlayerReady = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
@@ -312,7 +253,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 try {
                     JSONObject encryptedData = (JSONObject) args[0];
 
-                    // Decrypt the incoming data using hybrid decryption
                     String method = encryptedData.optString("method", "");
                     Object decryptedData;
 
@@ -339,9 +279,8 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             });
         }
     };
-    /**
-     * WebSocket event listener that handles when a player is no longer ready.
-     */
+
+    /** Handle player unready status */
     private Emitter.Listener onPlayerUnready = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
@@ -349,7 +288,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 try {
                     JSONObject encryptedData = (JSONObject) args[0];
 
-                    // Decrypt the incoming data using hybrid decryption
                     String method = encryptedData.optString("method", "");
                     Object decryptedData;
 
@@ -376,43 +314,23 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             });
         }
     };
-    /**
-     * WebSocket event listener that processes game start events.
-     */
+
+    /** Handle game start notification */
     private Emitter.Listener onGameStarted = new Emitter.Listener() {
         @Override
         public void call(Object... args) {
             runOnUiThread(() -> {
                 try {
-                    if (args.length > 0 && args[0] instanceof JSONObject) {
-                        JSONObject encryptedData = (JSONObject) args[0];
-
-                        // Try to decrypt if it seems to be encrypted
-                        if (encryptedData.has("method") || encryptedData.has("data")) {
-                            // Decrypt the incoming data using hybrid decryption
-                            String method = encryptedData.optString("method", "");
-                            if (method.equals("hybrid-rsa-aes")) {
-                                hybridEncryption.decryptWithPrivateKey(encryptedData, privateKey);
-                            } else if (encryptedData.has("data")) {
-                                hybridEncryption.decryptSymmetric(encryptedData);
-                            }
-                        }
-                    }
-
-                    // Dismiss countdown dialog if it's showing
                     if (countdownDialog != null && countdownDialog.isShowing()) {
                         countdownDialog.dismiss();
                     }
 
-                    // Set flag to indicate transition to gameplay
                     isTransitioningToGameplay = true;
 
                     Toast.makeText(WaitingRoom.this, "Game is starting!", Toast.LENGTH_SHORT).show();
 
-                    // Store the socket in the global manager
                     GlobalSocketManager.setSocket(mSocket);
 
-                    // Start the game activity
                     Intent intent = new Intent(WaitingRoom.this, Gameplay.class);
                     intent.putExtra("room_code", room_code);
                     intent.putExtra("character_name", currentPlayerCharacter);
@@ -421,12 +339,10 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                     finish();
                 } catch (Exception e) {
                     Log.e(TAG, "Error processing game started: " + e.getMessage(), e);
-                    // Still try to start the game
                     isTransitioningToGameplay = true;
 
                     Toast.makeText(WaitingRoom.this, "Game is starting!", Toast.LENGTH_SHORT).show();
 
-                    // Store the socket in the global manager
                     GlobalSocketManager.setSocket(mSocket);
 
                     Intent intent = new Intent(WaitingRoom.this, Gameplay.class);
@@ -439,14 +355,12 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             });
         }
     };
-    /**
-     * WebSocket event listener for connection validation before game start.
-     */
+
+    /** Handle connection validation before game start */
     private Emitter.Listener onValidateConnection = args -> {
         try {
             JSONObject encryptedData = (JSONObject) args[0];
 
-            // Decrypt the incoming data
             String method = encryptedData.optString("method", "");
             Object decryptedData;
 
@@ -463,25 +377,20 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 data = new JSONObject(decryptedData.toString());
             }
 
-            // Extract data from the validation request
             String roomCode = data.getString("room_code");
             int timeout = data.optInt("timeout", 10);
 
-            // Show a countdown dialog
             runOnUiThread(() -> {
                 showCountdownDialog(timeout);
             });
 
-            // Send ready confirmation back to the server
             try {
                 JSONObject readyData = new JSONObject();
                 readyData.put("username", username);
                 readyData.put("room_code", room_code);
 
-                // Encrypt using hybrid encryption
                 JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(readyData);
 
-                // Emit connection ready event
                 mSocket.emit("connection_ready", encryptedPayload);
 
                 Log.d(TAG, "Sent connection ready confirmation");
@@ -493,14 +402,12 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             Log.e(TAG, "Error processing validate connection event: " + e.getMessage(), e);
         }
     };
-    /**
-     * WebSocket event listener that handles game start failure scenarios.
-     */
+
+    /** Handle game start failure */
     private Emitter.Listener onGameStartFailed = args -> {
         try {
             JSONObject encryptedData = (JSONObject) args[0];
 
-            // Decrypt the data
             String method = encryptedData.optString("method", "");
             Object decryptedData;
 
@@ -520,17 +427,14 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             String reason = data.getString("reason");
 
             runOnUiThread(() -> {
-                // Dismiss countdown dialog if it's showing
                 if (countdownDialog != null && countdownDialog.isShowing()) {
                     countdownDialog.dismiss();
                 }
 
-                // Show failure message
                 Toast.makeText(WaitingRoom.this,
                         "Game failed to start: " + reason,
                         Toast.LENGTH_LONG).show();
 
-                // Reset the UI
                 is_pressed = false;
                 playButton.setButtonText("FIGHT!");
             });
@@ -539,11 +443,50 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             Log.e(TAG, "Error processing game start failed event: " + e.getMessage(), e);
         }
     };
+    /** Handle updates (mainly when a player leaves the room) */
+    private Emitter.Listener onUpdate = new Emitter.Listener() {
+        @Override
+        public void call(Object... args) {
+            runOnUiThread(() -> {
+                try {
+                    JSONObject encryptedData = (JSONObject) args[0];
 
-    /**
-     * Displays a countdown dialog with the specified duration.
-     * @param seconds The countdown duration in seconds
-     */
+                    String method = encryptedData.optString("method", "");
+                    Object decryptedData;
+
+                    if (method.equals("hybrid-rsa-aes")) {
+                        decryptedData = hybridEncryption.decryptWithPrivateKey(encryptedData, privateKey);
+                    } else {
+                        decryptedData = hybridEncryption.decryptSymmetric(encryptedData);
+                    }
+
+                    JSONObject data;
+                    if (decryptedData instanceof JSONObject) {
+                        data = (JSONObject) decryptedData;
+                    } else {
+                        data = new JSONObject(decryptedData.toString());
+                    }
+
+                    String type = data.getString("type");
+                    String affectedUsername = data.getString("username");
+
+                    if (type.equals("player_left") || type.equals("player_removed")) {
+                        Toast.makeText(WaitingRoom.this,
+                                affectedUsername + " has left the room",
+                                Toast.LENGTH_SHORT).show();
+
+                        // Refresh the UI to show updated groups
+                        refreshGroupsData();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error processing update: " + e.getMessage(), e);
+                }
+            });
+        }
+    };
+
+
+    /** Shows countdown before game starts */
     private void showCountdownDialog(int seconds) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Game Starting Soon")
@@ -553,7 +496,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         countdownDialog = builder.create();
         countdownDialog.show();
 
-        // Auto dismiss after timeout
         new Handler().postDelayed(() -> {
             if (countdownDialog != null && countdownDialog.isShowing()) {
                 countdownDialog.dismiss();
@@ -561,10 +503,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         }, seconds * 1000);
     }
 
-    /**
-     * Handles button click events for the activity.
-     * @param view The view that was clicked
-     */
     @Override
     public void onClick(View view) {
         if (view.getId() == R.id.join_group1 || view.getId() == R.id.join_group2) {
@@ -574,16 +512,12 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         }
     }
 
-    /**
-     * Sends request to join room with encrypted credentials.
-     */
     private void joinRoom() {
         try {
             JSONObject roomData = new JSONObject();
             roomData.put("username", username);
             roomData.put("room_code", room_code);
 
-            // Encrypt using hybrid encryption
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(roomData);
 
             mSocket.emit("join_room", encryptedPayload);
@@ -591,10 +525,8 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             Log.e(TAG, "Error encrypting join room data", e);
         }
     }
-    /**
-     * Handles the process of joining a character group.
-     * @param view The button view that triggered the action
-     */
+
+    /** Handles player selecting a group */
     private void handleGroupJoin(View view) {
         if (myCharacters.isEmpty()) {
             Toast.makeText(this, "You don't have any characters to select", Toast.LENGTH_SHORT).show();
@@ -613,7 +545,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                     currentPlayerCharacter = selectedCharacter.getCharacterName();
                     currentGroup = (view.getId() == R.id.join_group1) ? "group1" : "group2";
 
-                    // Emit group join via WebSocket with encryption
                     try {
                         JSONObject groupData = new JSONObject();
                         groupData.put("username", username);
@@ -621,7 +552,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                         groupData.put("group", currentGroup);
                         groupData.put("character_name", currentPlayerCharacter);
 
-                        // Encrypt using hybrid encryption
                         JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(groupData);
 
                         mSocket.emit("join_group", encryptedPayload);
@@ -631,9 +561,8 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 })
                 .show();
     }
-    /**
-     * Processes play button clicks for toggling ready status.
-     */
+
+    /** Handles ready/unready toggle */
     private void handlePlayButtonClick() {
         if (currentPlayerCharacter == null || currentGroup == null) {
             Toast.makeText(this, "Please select a character and join a group first", Toast.LENGTH_SHORT).show();
@@ -645,7 +574,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             readyData.put("username", username);
             readyData.put("room_code", room_code);
 
-            // Encrypt using hybrid encryption
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(readyData);
 
             if (is_pressed) {
@@ -662,16 +590,13 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         }
     }
 
-    /**
-     * Retrieves user's characters from server with encryption.
-     */
+    /** Loads user's characters from server */
     private void loadCharacters() {
         showLoadingDialog("Loading characters...");
         JSONObject jsonObject = new JSONObject();
         try {
             jsonObject.put("username", username);
 
-            // Encrypt using hybrid encryption - same as CharactersCreationRoom
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(jsonObject);
 
             RequestBody body = RequestBody.create(
@@ -709,7 +634,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                             String responseBody = response.body().string();
                             JSONObject jsonResponse = new JSONObject(responseBody);
 
-                            // Determine decryption method based on response
                             String method = jsonResponse.optString("method", "");
                             Object decryptedData;
 
@@ -767,9 +691,7 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             Log.e(TAG, "Error encrypting data for user characters: " + e.getMessage());
         }
     }
-    /**
-     * Refreshes both group data lists with a short delay.
-     */
+
     private void refreshGroupsData() {
         Log.d(TAG, "Refreshing groups data");
         new Handler().postDelayed(() -> {
@@ -777,15 +699,13 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             getGroup2();
         }, 300);
     }
-    /**
-     * Retrieves encrypted group 1 character data from server.
-     */
+
+    /** Gets group 1 data */
     private void getGroup1() {
         JSONObject jsonObject = new JSONObject();
         try {
             jsonObject.put("room_code", room_code);
 
-            // Encrypt using hybrid encryption
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(jsonObject);
 
             RequestBody body = RequestBody.create(
@@ -813,7 +733,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                             String responseBody = response.body().string();
                             JSONObject jsonResponse = new JSONObject(responseBody);
 
-                            // Determine decryption method based on response
                             String method = jsonResponse.optString("method", "");
                             Object decryptedData;
 
@@ -859,15 +778,13 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             Log.e(TAG, "Error creating request for group1: " + e.getMessage());
         }
     }
-    /**
-     * Retrieves encrypted group 2 character data from server.
-     */
+
+    /** Gets group 2 data */
     private void getGroup2() {
         JSONObject jsonObject = new JSONObject();
         try {
             jsonObject.put("room_code", room_code);
 
-            // Encrypt using hybrid encryption
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(jsonObject);
 
             RequestBody body = RequestBody.create(
@@ -895,7 +812,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                             String responseBody = response.body().string();
                             JSONObject jsonResponse = new JSONObject(responseBody);
 
-                            // Determine decryption method based on response
                             String method = jsonResponse.optString("method", "");
                             Object decryptedData;
 
@@ -941,16 +857,14 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             Log.e(TAG, "Error creating request for group2: " + e.getMessage());
         }
     }
-    /**
-     * Sends request to remove player from current room.
-     */
+
+    /** Removes player from room on server */
     private void removePlayerFromRoom() {
         JSONObject jsonObject = new JSONObject();
         try {
             jsonObject.put("username", username);
             jsonObject.put("room_code", room_code);
 
-            // Encrypt using hybrid encryption
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(jsonObject);
 
             RequestBody body = RequestBody.create(
@@ -984,10 +898,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         }
     }
 
-    /**
-     * Displays a loading dialog with custom message.
-     * @param message The message to display
-     */
     private void showLoadingDialog(String message) {
         runOnUiThread(() -> {
             if (loadingDialog != null && loadingDialog.isShowing()) {
@@ -1001,9 +911,7 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             loadingDialog.show();
         });
     }
-    /**
-     * Dismisses the loading dialog if it's showing.
-     */
+
     private void dismissLoadingDialog() {
         runOnUiThread(() -> {
             if (loadingDialog != null && loadingDialog.isShowing()) {
@@ -1012,9 +920,6 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
         });
     }
 
-    /**
-     * Handles back button press with confirmation dialog.
-     */
     @SuppressLint("MissingSuperCall")
     @Override
     public void onBackPressed() {
@@ -1022,16 +927,14 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 .setTitle("Leave Room")
                 .setMessage("Are you sure you want to leave this room?")
                 .setPositiveButton("Yes", (dialog, which) -> {
-                    isTransitioningToGameplay = false; // Ensure this flag is false when explicitly leaving
+                    isTransitioningToGameplay = false;
                     removePlayerFromRoom();
                     finish();
                 })
                 .setNegativeButton("No", null)
                 .show();
     }
-    /**
-     * Activity lifecycle method for resuming, reconnects socket if needed.
-     */
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -1039,22 +942,17 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
             mSocket.connect();
         }
     }
-    /**
-     * Activity lifecycle method for pausing.
-     */
+
     @Override
     protected void onPause() {
         super.onPause();
     }
-    /**
-     * Activity lifecycle method for cleanup, manages socket disconnection.
-     */
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
         if (mSocket != null) {
             try {
-                // Remove all listeners
                 mSocket.off("new_player", onNewPlayer);
                 mSocket.off("group_change", onGroupChange);
                 mSocket.off("player_ready", onPlayerReady);
@@ -1062,14 +960,12 @@ public class WaitingRoom extends AppCompatActivity implements View.OnClickListen
                 mSocket.off("game_started", onGameStarted);
                 mSocket.off("validate_connection", onValidateConnection);
                 mSocket.off("game_start_failed", onGameStartFailed);
+                mSocket.off("update", onUpdate);
 
-                // Only disconnect the socket if we're not transitioning to gameplay
                 if (!isTransitioningToGameplay) {
-                    // Simple disconnect
                     mSocket.disconnect();
                     GlobalSocketManager.setSocket(null);
 
-                    // Remove player from room
                     Log.d(TAG, "Destroying waiting room - removing player from room");
                     removePlayerFromRoom();
                 } else {

@@ -1,11 +1,9 @@
 /**
- * Rooms Activity - Handles game room creation and joining
+ * Rooms - Game room creation and joining screen
  *
- * This activity allows users to create new game rooms or join existing ones
- * using a room code. It manages the network communication for room operations
- * with secure encryption.
+ * Allows users to create new game rooms or join existing ones
+ * using room codes. Handles encrypted server communication.
  */
-
 package com.example.myproject;
 
 import android.app.AlertDialog;
@@ -30,40 +28,33 @@ import java.security.interfaces.RSAPrivateKey;
 import okhttp3.*;
 
 public class Rooms extends AppCompatActivity implements View.OnClickListener {
+    private AlertDialog currentDialog;
+    private AlertDialog loadingDialog;
 
-    private static final String TAG = "Rooms";
-    private AlertDialog currentDialog;           // Current displayed dialog
-    private RSAEncryption rsaEncryption;         // For RSA encryption operations
-    private HybridEncryption hybridEncryption;   // For hybrid encryption operations
-    private KeyPair keyPair;                     // User's RSA key pair
-    private RSAPrivateKey privateKey;            // User's private key for decryption
-    private String username;                     // Current user's username
-    private String roomCode = "0000";            // Default room code
-    private static final String SERVER_URL = "http://10.0.2.2:8080"; // Server URL
-    private AlertDialog loadingDialog;           // Dialog for showing loading state
+    private RSAEncryption rsaEncryption;
+    private HybridEncryption hybridEncryption;
+    private KeyPair keyPair;
+    private RSAPrivateKey privateKey;
+    private static final String SERVER_URL = "http://10.0.2.2:8080";
 
-    /**
-     * Initializes the activity, sets up UI components, and loads user data
-     */
+    private String username;
+    private String roomCode = "0000";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.rooms);
 
-        // Set up button click listeners
         findViewById(R.id.join_room).setOnClickListener(this);
         findViewById(R.id.create_room).setOnClickListener(this);
         findViewById(R.id.back_welcome).setOnClickListener(this);
 
-        // Get current username from shared preferences
         SharedPreferences prefs = getSharedPreferences("Current_Connection", MODE_PRIVATE);
         username = prefs.getString("username", "");
 
-        // Initialize encryption components
         rsaEncryption = new RSAEncryption(getApplicationContext());
         hybridEncryption = new HybridEncryption(getApplicationContext());
 
-        // Load the private key for decryption
         try {
             privateKey = rsaEncryption.loadPrivateKeyFromSharedPreferences();
             if (privateKey == null) {
@@ -76,11 +67,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
         }
     }
 
-    /**
-     * Handles button click events
-     *
-     * @param v The view that was clicked
-     */
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.join_room) {
@@ -94,11 +80,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
         }
     }
 
-    /**
-     * Shows dialog for joining an existing room
-     *
-     * Validates network connectivity before showing the dialog
-     */
     private void showJoinRoomDialog() {
         if (!isNetworkAvailable()) {
             Toast.makeText(this, "No network connection available", Toast.LENGTH_SHORT).show();
@@ -118,11 +99,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
         currentDialog.show();
     }
 
-    /**
-     * Shows dialog for creating a new room
-     *
-     * Validates network connectivity before showing the dialog
-     */
     private void showCreateRoomDialog() {
         if (!isNetworkAvailable()) {
             Toast.makeText(this, "No network connection available", Toast.LENGTH_SHORT).show();
@@ -142,11 +118,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
         currentDialog.show();
     }
 
-    /**
-     * Shows a loading dialog with the given message
-     *
-     * @param message The message to display in the loading dialog
-     */
     private void showLoadingDialog(String message) {
         runOnUiThread(() -> {
             if (loadingDialog != null && loadingDialog.isShowing()) {
@@ -161,9 +132,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
         });
     }
 
-    /**
-     * Dismisses the loading dialog if it's showing
-     */
     private void dismissLoadingDialog() {
         runOnUiThread(() -> {
             if (loadingDialog != null && loadingDialog.isShowing()) {
@@ -172,15 +140,10 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
         });
     }
 
-    /**
-     * Handles the join button click in the join room dialog
-     *
-     * @param dialogView The view containing the dialog
-     */
     private void handleJoinButtonClick(View dialogView) {
         EditText room_codeInput = dialogView.findViewById(R.id.room_code);
         if (room_codeInput == null) {
-            Log.e(TAG, "Room code input field not found");
+            Log.e("rooms", "Room code input field not found");
             Toast.makeText(this, "Error: room code input not found", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -194,25 +157,15 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
         }
     }
 
-    /**
-     * Handles the create button click in the create room dialog
-     */
     private void handleCreateButtonClick() {
         createRoom();
     }
 
-    /**
-     * Handles the back button click in any dialog
-     */
     private void handleBackButtonClick() {
         if (currentDialog != null) currentDialog.dismiss();
     }
 
-    /**
-     * Sends a request to join an existing room with the given code
-     *
-     * @param room_code The code of the room to join
-     */
+    /** Joins existing room with provided code */
     private void joinRoom(String room_code) {
         showLoadingDialog("Joining room...");
         OkHttpClient client = new OkHttpClient();
@@ -221,7 +174,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
             jsonObject.put("username", username);
             jsonObject.put("room_code", room_code);
 
-            // Encrypt the request payload
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(jsonObject);
 
             RequestBody body = RequestBody.create(
@@ -234,11 +186,10 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
                     .post(body)
                     .build();
 
-            // Send the request asynchronously
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    Log.e(TAG, "Network failure when joining room", e);
+                    Log.e("rooms", "Network failure when joining room", e);
                     runOnUiThread(() -> {
                         dismissLoadingDialog();
                         Toast.makeText(Rooms.this, "Network error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -260,7 +211,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
                                 Toast.makeText(Rooms.this, "Joined room successfully", Toast.LENGTH_SHORT).show();
                                 if (currentDialog != null) currentDialog.dismiss();
 
-                                // Forward to waiting room with the room code
                                 Intent intent = new Intent(Rooms.this, WaitingRoom.class);
                                 intent.putExtra("room_code", room_code);
                                 startActivity(intent);
@@ -273,17 +223,13 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "Error creating JSON for join room", e);
+            Log.e("rooms", "Error creating JSON for join room", e);
             dismissLoadingDialog();
             Toast.makeText(this, "Error preparing request: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
-    /**
-     * Sends a request to create a new room
-     *
-     * On success, transitions to the WaitingRoom activity with the new room code
-     */
+    /** Creates new game room */
     private void createRoom() {
         showLoadingDialog("Creating room...");
         OkHttpClient client = new OkHttpClient();
@@ -291,7 +237,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
         try {
             jsonObject.put("username", username);
 
-            // Encrypt the request payload
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(jsonObject);
 
             RequestBody body = RequestBody.create(
@@ -304,11 +249,10 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
                     .post(body)
                     .build();
 
-            // Send the request asynchronously
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    Log.e(TAG, "Network failure when creating room", e);
+                    Log.e("rooms", "Network failure when creating room", e);
                     runOnUiThread(() -> {
                         dismissLoadingDialog();
                         Toast.makeText(Rooms.this, "Network error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -328,7 +272,6 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
                             String responseBody = response.body().string();
                             JSONObject jsonResponse = new JSONObject(responseBody);
 
-                            // Determine encryption method and decrypt response
                             String method = jsonResponse.optString("method", "");
                             Object decryptedData;
 
@@ -345,21 +288,19 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
                                 decryptedJson = new JSONObject(decryptedData.toString());
                             }
 
-                            // Extract room code from response
                             roomCode = decryptedJson.getString("room_code");
                             runOnUiThread(() -> {
                                 dismissLoadingDialog();
                                 Toast.makeText(Rooms.this, "Created room successfully", Toast.LENGTH_SHORT).show();
                                 if (currentDialog != null) currentDialog.dismiss();
 
-                                // Forward to waiting room with the new room code
                                 Intent intent = new Intent(Rooms.this, WaitingRoom.class);
                                 intent.putExtra("room_code", roomCode);
                                 startActivity(intent);
                             });
 
                         } catch (Exception e) {
-                            Log.e(TAG, "Error parsing room creation response: " + e.getMessage(), e);
+                            Log.e("rooms", "Error parsing room creation response: " + e.getMessage(), e);
                             runOnUiThread(() -> {
                                 dismissLoadingDialog();
                                 Toast.makeText(Rooms.this, "Error reading room data: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -369,32 +310,24 @@ public class Rooms extends AppCompatActivity implements View.OnClickListener {
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "Error creating JSON for create room", e);
+            Log.e("rooms", "Error creating JSON for create room", e);
             dismissLoadingDialog();
             Toast.makeText(this, "Error preparing request: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
-    /**
-     * Checks if network connectivity is available
-     *
-     * @return true if network is available, false otherwise
-     */
     private boolean isNetworkAvailable() {
         ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
         boolean isAvailable = activeNetworkInfo != null && activeNetworkInfo.isConnected();
 
         if (!isAvailable) {
-            Log.w(TAG, "No network connection available");
+            Log.w("rooms", "No network connection available");
         }
 
         return isAvailable;
     }
 
-    /**
-     * Cleans up resources when the activity is destroyed
-     */
     @Override
     protected void onDestroy() {
         super.onDestroy();

@@ -28,7 +28,7 @@ from flask_socketio import SocketIO
 import traceback
 from flask_cors import CORS
 import json
-from HybridEncryption import HybridEncryption
+from security.hybrid_encryption import HybridEncryption
 
 
 # Dictionary to track active game rooms and connected clients
@@ -64,7 +64,7 @@ socketio = SocketIO(
 )
 
 # Initialize Firebase
-cred = credentials.Certificate("fightsintheforest-firebase-adminsdk-fbsvc-c35c3cb72b.json")
+cred = credentials.Certificate("raw/fightsintheforest-firebase-adminsdk-fbsvc-c35c3cb72b.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 print("Connected to Firebase Firestore")
@@ -96,8 +96,8 @@ def load_key(file_path):
 
 
 # Load the server's keys
-private_key = load_key("private.txt")
-public_key = load_key("public.txt")
+private_key = load_key("raw/private.txt")
+public_key = load_key("raw/public.txt")
 
 
 # Retrieves a user's public key from the database with decryption
@@ -136,7 +136,6 @@ def get_public_key(username):
     except Exception as e:
         print(f"Error retrieving public key for {username}: {str(e)}")
         return None
-
 
 # Encrypts response data using the hybrid encryption system
 def encrypt_response(response_data, username=None):
@@ -289,7 +288,6 @@ def hash_password(password):
         str: The hashed password as a string
     """
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
 
 # Verifies a password against its hashed version
 def check_password(stored_hash, password):

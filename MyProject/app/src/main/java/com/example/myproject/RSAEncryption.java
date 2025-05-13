@@ -1,9 +1,9 @@
 /**
- * RSAEncryption.java - Class for handling RSA encryption operations
+ * RSAEncryption - Handles RSA key operations
  *
- * This class manages RSA key pair generation, storage, and provides utility
- * methods for importing/exporting keys in Base64 format. Keys are stored in
- * the application's SharedPreferences for persistence.
+ * Manages key pair generation, storage in SharedPreferences,
+ * and Base64 import/export utilities. Used by HybridEncryption
+ * for secure communications.
  */
 package com.example.myproject;
 
@@ -33,75 +33,36 @@ import javax.crypto.Cipher;
 public class RSAEncryption {
     private final Context context;
     private static final String TAG = "RSAEncryption";
-    private static final int DEFAULT_KEY_SIZE = 2048; // Industry standard key size
+    private static final int DEFAULT_KEY_SIZE = 2048;
 
-    // Constants for SharedPreferences
     private static final String PREFS_NAME = "rsa_keys";
     private static final String PREF_PUBLIC_KEY = "public_key";
     private static final String PREF_PRIVATE_KEY = "private_key";
 
-    /**
-     * Constructor that takes an Android context
-     *
-     * @param context The application context for accessing SharedPreferences
-     */
     public RSAEncryption(Context context) {
         this.context = context;
     }
 
-    /**
-     * Generates a new RSA key pair with specified key size
-     *
-     * @param keySize The size of the key in bits (e.g., 2048, 4096)
-     * @return A KeyPair containing public and private RSA keys
-     * @throws Exception If key generation fails
-     */
     public KeyPair generateKeyPair(int keySize) throws Exception {
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
         keyPairGenerator.initialize(keySize, new SecureRandom());
         return keyPairGenerator.generateKeyPair();
     }
 
-    /**
-     * Generates a new RSA key pair with default key size (2048 bits)
-     *
-     * @return A KeyPair containing public and private RSA keys
-     * @throws Exception If key generation fails
-     */
     public KeyPair generateKeyPair() throws Exception {
         return generateKeyPair(DEFAULT_KEY_SIZE);
     }
 
-    /**
-     * Exports the public key to Base64 format for transmission
-     *
-     * @param publicKey The RSA public key to export
-     * @return Base64-encoded string representation of the public key
-     * @throws Exception If key export fails
-     */
     public String exportPublicKeyToBase64(RSAPublicKey publicKey) throws Exception {
         X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(publicKey.getEncoded());
         return Base64.encodeToString(x509EncodedKeySpec.getEncoded(), Base64.NO_WRAP);
     }
 
-    /**
-     * Exports the private key to Base64 format
-     *
-     * @param privateKey The RSA private key to export
-     * @return Base64-encoded string representation of the private key
-     * @throws Exception If key export fails
-     */
     public String exportPrivateKeyToBase64(RSAPrivateKey privateKey) throws Exception {
         PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(privateKey.getEncoded());
         return Base64.encodeToString(pkcs8EncodedKeySpec.getEncoded(), Base64.NO_WRAP);
     }
 
-    /**
-     * Saves the key pair to SharedPreferences for persistence
-     *
-     * @param keyPair The key pair to save
-     * @throws Exception If saving keys fails
-     */
     public void saveKeyPairToSharedPreferences(KeyPair keyPair) throws Exception {
         RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
         RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
@@ -118,13 +79,7 @@ public class RSAEncryption {
         Log.d(TAG, "Key pair saved to SharedPreferences");
     }
 
-    /**
-     * Loads a public key from a resource file
-     *
-     * @param resId Resource ID of the file containing the Base64-encoded public key
-     * @return RSA public key object
-     * @throws Exception If loading the key fails
-     */
+    /** Loads server public key from resources */
     public RSAPublicKey loadPublicKey(int resId) throws Exception {
         InputStream inputStream = context.getResources().openRawResource(resId);
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -144,12 +99,7 @@ public class RSAEncryption {
         return (RSAPublicKey) keyFactory.generatePublic(keySpec);
     }
 
-    /**
-     * Loads only the RSA private key from SharedPreferences
-     *
-     * @return RSA private key object, or null if key isn't found
-     * @throws Exception If loading the key fails
-     */
+    /** Loads your private key from SharedPreferences */
     public RSAPrivateKey loadPrivateKeyFromSharedPreferences() throws Exception {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String privateKeyBase64 = prefs.getString(PREF_PRIVATE_KEY, null);
@@ -162,13 +112,6 @@ public class RSAEncryption {
         return loadPrivateKeyFromBase64(privateKeyBase64);
     }
 
-    /**
-     * Loads a public key from a Base64 string
-     *
-     * @param base64PublicKey Base64-encoded public key string
-     * @return RSA public key object
-     * @throws Exception If loading the key fails
-     */
     public RSAPublicKey loadPublicKeyFromBase64(String base64PublicKey) throws Exception {
         byte[] keyBytes = Base64.decode(base64PublicKey, Base64.NO_WRAP);
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
@@ -176,13 +119,6 @@ public class RSAEncryption {
         return (RSAPublicKey) keyFactory.generatePublic(keySpec);
     }
 
-    /**
-     * Loads a private key from a Base64 string
-     *
-     * @param base64PrivateKey Base64-encoded private key string
-     * @return RSA private key object
-     * @throws Exception If loading the key fails
-     */
     public RSAPrivateKey loadPrivateKeyFromBase64(String base64PrivateKey) throws Exception {
         byte[] keyBytes = Base64.decode(base64PrivateKey, Base64.NO_WRAP);
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
@@ -190,12 +126,6 @@ public class RSAEncryption {
         return (RSAPrivateKey) keyFactory.generatePrivate(keySpec);
     }
 
-    /**
-     * Loads the RSA key pair from SharedPreferences
-     *
-     * @return KeyPair object containing the saved keys, or null if keys aren't found
-     * @throws Exception If loading keys fails
-     */
     public KeyPair loadKeyPairFromSharedPreferences() throws Exception {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
@@ -213,34 +143,18 @@ public class RSAEncryption {
         return new KeyPair(publicKey, privateKey);
     }
 
-    /**
-     * Checks if RSA keys exist in SharedPreferences
-     *
-     * @return true if both public and private keys exist, false otherwise
-     */
     public boolean keysExistInSharedPreferences() {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         return prefs.contains(PREF_PUBLIC_KEY) && prefs.contains(PREF_PRIVATE_KEY);
     }
 
-    /**
-     * Generates a new key pair and saves it to SharedPreferences
-     *
-     * @return The generated KeyPair
-     * @throws Exception If generation or saving fails
-     */
     public KeyPair generateAndSaveKeyPair() throws Exception {
         KeyPair keyPair = generateKeyPair();
         saveKeyPairToSharedPreferences(keyPair);
         return keyPair;
     }
 
-    /**
-     * Gets the key pair from SharedPreferences or generates a new one if none exists
-     *
-     * @return The loaded or newly generated KeyPair
-     * @throws Exception If loading or generation fails
-     */
+    /** Gets existing key pair or creates new one if needed */
     public KeyPair getOrCreateKeyPair() throws Exception {
         if (keysExistInSharedPreferences()) {
             KeyPair keyPair = loadKeyPairFromSharedPreferences();
@@ -248,8 +162,6 @@ public class RSAEncryption {
                 return keyPair;
             }
         }
-
-        // If we get here, either no keys exist or loading failed
         return generateAndSaveKeyPair();
     }
 }

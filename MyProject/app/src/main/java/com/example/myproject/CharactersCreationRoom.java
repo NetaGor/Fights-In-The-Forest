@@ -1,9 +1,8 @@
 /**
- * CharactersCreationRoom.java - Activity for managing characters
+ * CharactersCreationRoom - Character management screen
  *
- * This activity allows users to view, create, edit, and delete their game
- * characters. It communicates with the server to fetch and update character
- * data with encrypted communication for security.
+ * Handles loading, displaying and managing user's characters.
+ * All server communication uses hybrid encryption for security.
  */
 package com.example.myproject;
 
@@ -31,41 +30,35 @@ import java.util.List;
 import okhttp3.*;
 
 public class CharactersCreationRoom extends AppCompatActivity implements View.OnClickListener {
-    static List<CharactersList> characters = new ArrayList<>(); // List of the user's characters
-    String username;                                           // Current user's username
-    private CustomButton addCharacterButton, backButton;       // UI buttons
-    private ListView characterListView;                        // ListView for displaying characters
-    private CharactersListAdapter adapter;                     // Adapter for the character list
-    private RSAEncryption rsaEncryption;                       // For RSA encryption operations
-    private HybridEncryption hybridEncryption;                 // For hybrid encryption operations
-    private RSAPrivateKey privateKey;                          // User's private key for decryption
-    private static final String TAG = "CharactersCreationRoom"; // Tag for logging
-    private static final String SERVER_URL = "http://10.0.2.2:8080"; // Server URL (localhost for emulator)
+    private CustomButton addCharacterButton, backButton;
+    private ListView characterListView;
+    private CharactersListAdapter adapter;
+    static List<CharactersList> characters = new ArrayList<>();
+    String username;
 
-    /**
-     * Initializes the activity, sets up UI components, and loads characters
-     */
+    private RSAEncryption rsaEncryption;
+    private HybridEncryption hybridEncryption;
+    private RSAPrivateKey privateKey;
+
+    private static final String SERVER_URL = "http://10.0.2.2:8080";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.characters);
 
-        // Initialize UI components
         characterListView = findViewById(R.id.list_characters);
         addCharacterButton = findViewById(R.id.add_character);
         backButton = findViewById(R.id.back);
         addCharacterButton.setOnClickListener(this);
         backButton.setOnClickListener(this);
 
-        // Get current username from shared preferences
         SharedPreferences prefs = getSharedPreferences("Current_Connection", MODE_PRIVATE);
         username = prefs.getString("username", "");
 
-        // Initialize encryption components
         rsaEncryption = new RSAEncryption(getApplicationContext());
         hybridEncryption = new HybridEncryption(getApplicationContext());
 
-        // Load the private key for decryption
         try {
             privateKey = rsaEncryption.loadPrivateKeyFromSharedPreferences();
             if (privateKey == null) {
@@ -77,14 +70,11 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
             Toast.makeText(this, "Error loading encryption keys: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
 
-        // Load the user's characters from the server
         loadCharacters();
 
-        // Set up the list adapter and item click listeners
         adapter = new CharactersListAdapter(this, characters);
         characterListView.setAdapter(adapter);
 
-        // Set up click listener for editing a character
         characterListView.setOnItemClickListener((parent, view, position, id) -> {
             Intent intent = new Intent(CharactersCreationRoom.this, EditCharactersCreationRoom.class);
             intent.putExtra("character_index", position);
@@ -92,7 +82,6 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
             startActivityForResult(intent, 1);
         });
 
-        // Set up long-click listener for deleting a character
         characterListView.setOnItemLongClickListener((parent, view, position, id) -> {
             new AlertDialog.Builder(CharactersCreationRoom.this)
                     .setTitle("Delete Character")
@@ -107,11 +96,6 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
         });
     }
 
-    /**
-     * Handles button click events
-     *
-     * @param v The view that was clicked
-     */
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.add_character) {
@@ -123,29 +107,21 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
         }
     }
 
-    /**
-     * Handles the result from the EditCharactersCreationRoom activity
-     */
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 1 && resultCode == RESULT_OK) {
-            loadCharacters(); // Reload characters after edit/create
+            loadCharacters();
         }
     }
 
-    /**
-     * Loads the user's characters from the server
-     *
-     * Uses encrypted communication to securely fetch character data
-     */
+    /** Loads user's characters with encrypted server request */
     private void loadCharacters() {
         OkHttpClient client = new OkHttpClient();
         JSONObject jsonObject = new JSONObject();
         try {
             jsonObject.put("username", username);
 
-            // Encrypt the request payload
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(jsonObject);
 
             RequestBody body = RequestBody.create(
@@ -158,11 +134,9 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
                     .post(body)
                     .build();
 
-            // Send the request asynchronously
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    Log.e(TAG, "Network request failed: " + e.getMessage(), e);
                     runOnUiThread(() -> Toast.makeText(CharactersCreationRoom.this,
                             "Failed to load characters: " + e.getMessage(), Toast.LENGTH_SHORT).show());
                 }
@@ -170,7 +144,6 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
                     if (!response.isSuccessful()) {
-                        Log.e(TAG, "Server returned error: " + response.code());
                         runOnUiThread(() -> Toast.makeText(CharactersCreationRoom.this,
                                 "Error fetching characters: " + response.code(), Toast.LENGTH_SHORT).show());
                     } else {
@@ -178,7 +151,6 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
                             String responseBody = response.body().string();
                             JSONObject jsonResponse = new JSONObject(responseBody);
 
-                            // Determine encryption method and decrypt response
                             String method = jsonResponse.optString("method", "");
                             Object decryptedData;
 
@@ -195,7 +167,6 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
                                 decryptedJson = new JSONObject(decryptedData.toString());
                             }
 
-                            // Parse character data from the response
                             JSONArray charactersArray = decryptedJson.getJSONArray("characters");
 
                             characters.clear();
@@ -208,7 +179,6 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
                                         username
                                 );
 
-                                // Parse abilities for each character
                                 JSONArray abilitiesArray = characterObject.getJSONArray("abilities");
                                 List<String> abilities = new ArrayList<>();
                                 for (int j = 0; j < abilitiesArray.length(); j++) {
@@ -218,7 +188,6 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
                                 characters.add(character);
                             }
 
-                            // Update UI on the main thread
                             runOnUiThread(() -> {
                                 adapter.notifyDataSetChanged();
                                 Toast.makeText(CharactersCreationRoom.this,
@@ -238,11 +207,7 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
         }
     }
 
-    /**
-     * Deletes a character at the specified position
-     *
-     * @param position The position of the character in the list to delete
-     */
+    /** Deletes character at specified position */
     private void deleteCharacter(int position) {
         OkHttpClient client = new OkHttpClient();
         JSONObject jsonObject = new JSONObject();
@@ -250,7 +215,6 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
             jsonObject.put("username", username);
             jsonObject.put("name", characters.get(position).getCharacterName());
 
-            // Encrypt the request payload
             JSONObject encryptedPayload = hybridEncryption.encryptWithPublicKey(jsonObject);
 
             RequestBody body = RequestBody.create(
@@ -259,11 +223,10 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
             );
 
             Request request = new Request.Builder()
-                    .url(SERVER_URL + "/get_characters")
+                    .url(SERVER_URL + "/delete_character")
                     .post(body)
                     .build();
 
-            // Send the request asynchronously
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
@@ -278,7 +241,7 @@ public class CharactersCreationRoom extends AppCompatActivity implements View.On
                                 "Error deleting character: " + response.code(), Toast.LENGTH_SHORT).show());
                     } else {
                         try {
-                            loadCharacters(); // Reload characters after deletion
+                            loadCharacters();
                             runOnUiThread(() -> Toast.makeText(CharactersCreationRoom.this,
                                     "Character deleted successfully", Toast.LENGTH_SHORT).show());
                         } catch (Exception e) {

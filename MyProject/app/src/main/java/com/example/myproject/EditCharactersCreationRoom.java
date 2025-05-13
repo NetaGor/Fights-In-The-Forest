@@ -1,8 +1,9 @@
 /**
- * Activity for creating and editing game characters.
- * Allows users to set character name, description, and select abilities.
+ * EditCharactersCreationRoom - Character creation/editing screen
+ *
+ * Allows users to create new characters or edit existing ones.
+ * Handles character name, description, and ability selection.
  */
-
 package com.example.myproject;
 
 import android.content.Intent;
@@ -31,24 +32,19 @@ import okhttp3.*;
 public class EditCharactersCreationRoom extends AppCompatActivity {
     private EditText characterNameEditText, descriptionEditText;
     private CustomButton saveButton, viewAbilitiesButton;
+
     private List<String> abilities = new ArrayList<>();
     private List<String> selectedAbilitiesList = new ArrayList<>();
     private List<Toolbar> toolbars = new ArrayList<>();
     private Map<Toolbar, String> toolbarAbilities = new HashMap<>();
     private String username;
+    private int characterIndex = -1;
+
     private RSAEncryption rsaEncryption;
     private HybridEncryption hybridEncryption;
     private RSAPrivateKey privateKey;
-    private int characterIndex = -1;
-    private static final String SERVER_URL = "http://10.0.2.2:8080"; // Replace with your actual server URL
+    private static final String SERVER_URL = "http://10.0.2.2:8080";
 
-    /**
-     * Initializes the activity, sets up UI elements, loads encryption keys,
-     * and retrieves character data if editing an existing character.
-     *
-     * @param savedInstanceState If the activity is being re-initialized after previously being shut down,
-     *                          this contains the data it most recently supplied in onSaveInstanceState.
-     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -58,8 +54,6 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
         descriptionEditText = findViewById(R.id.description_edit_text);
         saveButton = findViewById(R.id.save_button);
         saveButton.setOnClickListener(v -> saveCharacter());
-
-        // Initialize the view abilities button
         viewAbilitiesButton = findViewById(R.id.view_abilities_button);
         viewAbilitiesButton.setOnClickListener(v -> showAbilitiesDescriptionsDialog());
 
@@ -104,11 +98,6 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
         loadAbilitiesFromServer();
     }
 
-    /**
-     * Displays a dialog for selecting an ability to assign to a toolbar.
-     *
-     * @param toolbar The toolbar to which the selected ability will be assigned
-     */
     private void showAbilityPicker(Toolbar toolbar) {
         String[] abilitiesArray = abilities.toArray(new String[0]);
 
@@ -126,47 +115,25 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
                 .show();
     }
 
-    /**
-     * Assigns a selected ability to a toolbar, updating the available abilities list
-     * and selected abilities list. If the toolbar already had an ability assigned,
-     * it's returned to the available abilities list.
-     *
-     * @param toolbar The toolbar to which the ability is being assigned
-     * @param ability The name of the ability to assign
-     */
     private void assignAbilityToToolbar(Toolbar toolbar, String ability) {
         String previousAbility = toolbarAbilities.get(toolbar);
 
-        // Remove the new ability from available list
         abilities.remove(ability);
 
-        // If there was a previously assigned ability, add it back to available list
         if (previousAbility != null) {
             abilities.add(previousAbility);
-            // Also remove it from selected list
             selectedAbilitiesList.remove(previousAbility);
         }
 
-        // Add the new ability to selected list
         selectedAbilitiesList.add(ability);
-
-        // Update the toolbar map
         toolbarAbilities.put(toolbar, ability);
-
-        // Update toolbar title
         toolbar.setTitle(ability);
     }
 
-    /**
-     * Populates the toolbars with previously selected abilities when editing an existing character.
-     *
-     * @param existingAbilities List of ability names that were previously assigned to the character
-     */
     private void loadExistingAbilities(List<String> existingAbilities) {
         selectedAbilitiesList.clear();
         toolbarAbilities.clear();
 
-        // Add existing abilities to selected list and assign to toolbars
         for (int i = 0; i < Math.min(existingAbilities.size(), toolbars.size()); i++) {
             String ability = existingAbilities.get(i);
             Toolbar toolbar = toolbars.get(i);
@@ -176,12 +143,7 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
         }
     }
 
-    /**
-     * Retrieves detailed information about a specific ability from the server.
-     * Uses encryption for secure communication.
-     *
-     * @param abilityName The name of the ability to retrieve details for
-     */
+    /** Fetches ability details from server */
     private void getAbilityDetails(String abilityName) {
         OkHttpClient client = new OkHttpClient();
         JSONObject jsonObject = new JSONObject();
@@ -261,12 +223,6 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
         }
     }
 
-    /**
-     * Displays a dialog showing the details of a selected ability.
-     *
-     * @param abilityName The name of the ability
-     * @param description The detailed description of the ability
-     */
     private void showAbilityDescriptionDialog(String abilityName, String description) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(abilityName)
@@ -275,12 +231,8 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
                 .show();
     }
 
-    /**
-     * Shows a dialog listing all available abilities that the user can select to view details.
-     * Includes both available and already selected abilities.
-     */
+    /** Shows all available abilities for viewing details */
     private void showAbilitiesDescriptionsDialog() {
-        // Create a list of all available abilities to show descriptions for
         List<String> allAbilitiesList = new ArrayList<>(abilities);
         allAbilitiesList.addAll(selectedAbilitiesList);
 
@@ -289,7 +241,6 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
             return;
         }
 
-        // Create a list of ability names for the dialog
         final String[] abilitiesArray = allAbilitiesList.toArray(new String[0]);
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -302,10 +253,7 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
                 .show();
     }
 
-    /**
-     * Fetches the list of available abilities from the server.
-     * Uses encryption for secure communication.
-     */
+    /** Loads available abilities from server */
     private void loadAbilitiesFromServer() {
         OkHttpClient client = new OkHttpClient();
         JSONObject jsonObject = new JSONObject();
@@ -362,7 +310,6 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
                                 tempAbilities.add(abilitiesArray.getString(i));
                             }
 
-                            // Remove already selected abilities
                             for (String selectedAbility : selectedAbilitiesList) {
                                 tempAbilities.remove(selectedAbility);
                             }
@@ -384,11 +331,7 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
         }
     }
 
-    /**
-     * Validates and saves the character information to the server.
-     * Checks for empty fields, length limits, duplicate names, and required abilities.
-     * Uses encryption for secure communication.
-     */
+    /** Validates and saves character to server */
     private void saveCharacter() {
         String name = characterNameEditText.getText().toString().trim();
         String description = descriptionEditText.getText().toString().trim();
@@ -410,7 +353,6 @@ public class EditCharactersCreationRoom extends AppCompatActivity {
             }
         }
 
-        // Verify all toolbars have an ability assigned
         for (Toolbar toolbar : toolbars) {
             if (toolbarAbilities.get(toolbar) == null) {
                 Toast.makeText(this, "Please pick 6 abilities.", Toast.LENGTH_SHORT).show();

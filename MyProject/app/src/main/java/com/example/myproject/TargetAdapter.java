@@ -1,8 +1,8 @@
 /**
- * TargetAdapter.java - Adapter for displaying target selection items
+ * TargetAdapter - ListView adapter for target selection
  *
- * This adapter handles the display of character targets in list views,
- * binding character data to the target_list_item layout with visual health indicators.
+ * Displays characters with health info for ability targeting.
+ * Updated to use username-based health tracking and only show characters with health > 0.
  */
 package com.example.myproject;
 
@@ -17,61 +17,76 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class TargetAdapter extends ArrayAdapter<CharactersList> {
-    /**
-     * Constructor for the adapter
-     *
-     * @param context The application context
-     * @param characters List of character objects to display as targets
-     */
+    private List<CharactersList> filteredCharacters;
+
     public TargetAdapter(Context context, List<CharactersList> characters) {
-        super(context, 0, characters);
+        super(context, 0, filterAliveCharacters(characters));
+        this.filteredCharacters = filterAliveCharacters(characters);
     }
 
     /**
-     * Creates or reuses a view for a list item and populates it with target data
-     *
-     * @param position The position of the item in the list
-     * @param convertView The recycled view to populate
-     * @param parent The parent that this view will eventually be attached to
-     * @return The view for the specified position
+     * Filter to only show characters with health > 0
      */
+    private static List<CharactersList> filterAliveCharacters(List<CharactersList> characters) {
+        List<CharactersList> aliveCharacters = new ArrayList<>();
+        for (CharactersList character : characters) {
+            String playerUsername = character.getUsername();
+            if (Gameplay.characterHealth.containsKey(playerUsername) &&
+                    Gameplay.characterHealth.get(playerUsername) > 0) {
+                aliveCharacters.add(character);
+            }
+        }
+        return aliveCharacters;
+    }
+
+    @Override
+    public int getCount() {
+        return filteredCharacters.size();
+    }
+
+    @Override
+    public CharactersList getItem(int position) {
+        return filteredCharacters.get(position);
+    }
+
     @NonNull
     @Override
     public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-        // Create view if needed
         if (convertView == null) {
             convertView = LayoutInflater.from(getContext()).inflate(R.layout.target_list_item, parent, false);
         }
 
-        // Get the character at this position
         CharactersList character = getItem(position);
 
-        // Find view elements
         TextView characterNameView = convertView.findViewById(R.id.character_name);
         TextView usernameView = convertView.findViewById(R.id.username);
         TextView healthView = convertView.findViewById(R.id.health_value);
 
         if (character != null) {
-            // Bind character data to views
             characterNameView.setText(character.getCharacterName());
             usernameView.setText("Player: " + character.getUsername());
 
-            // Get health from our health map and update UI accordingly
-            Integer health = Gameplay.characterHealth.get(character.getCharacterName());
+            // Get health by username instead of character name
+            String playerUsername = character.getUsername();
+            Integer health = Gameplay.characterHealth.get(playerUsername);
+
             if (health != null) {
                 healthView.setText("HP: " + health);
 
-                // Change color based on health level
                 if (health <= 10) {
-                    healthView.setTextColor(Color.RED);     // Critical health
+                    healthView.setTextColor(Color.RED);
                 } else if (health <= 25) {
-                    healthView.setTextColor(Color.YELLOW);  // Low health
+                    healthView.setTextColor(Color.YELLOW);
                 } else {
-                    healthView.setTextColor(Color.GREEN);   // Normal health
+                    healthView.setTextColor(Color.GREEN);
                 }
+            } else {
+                healthView.setText("HP: 0");
+                healthView.setTextColor(Color.RED);
             }
         }
 

@@ -1,6 +1,11 @@
-# SERVER-SIDE ENCRYPTION FIXES
+"""
+Hybrid encryption class combining RSA and AES encryption.
 
-# 1. Update HybridEncryption.py to handle hybrid-encrypted requests
+Handles:
+- Asymmetric key encryption
+- Symmetric fallback encryption
+- Secure key and data handling
+"""
 
 from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.PublicKey import RSA
@@ -14,35 +19,18 @@ import traceback
 class HybridEncryption:
     """
     Hybrid encryption utility that combines RSA and AES encryption.
-    - Uses RSA for encrypting a random AES key
-    - Uses AES for encrypting the actual data
+    Uses RSA for key exchange and AES for data encryption.
     """
 
-    def __init__(self, symmetric_key=b'ThisIsASecretKey', symmetric_iv=b'ThisIsAnIVectors'):
-        """
-        Initialize with fallback symmetric encryption parameters
-
-        Parameters:
-        symmetric_key (bytes): 16-byte key for AES-128 encryption when RSA fails
-        symmetric_iv (bytes): 16-byte initialization vector when RSA fails
-        """
-        # Ensure key and IV are the right length for fallback symmetric encryption
+    def __init__(self, symmetric_key=b'SecureKey7890123', symmetric_iv=b'Vector4567890123'):
+        """Sets up symmetric encryption fallback parameters."""
         self.symmetric_key = symmetric_key[:16].ljust(16, b'\0')
         self.symmetric_iv = symmetric_iv[:16].ljust(16, b'\0')
 
     def encrypt_with_public_key(self, data, public_key_str):
-        """
-        Encrypt data using hybrid encryption (RSA + AES)
-
-        Parameters:
-        data (dict/str): Data to encrypt
-        public_key_str (str): RSA public key in PEM or base64 format
-
-        Returns:
-        dict: Dictionary with encrypted data, encrypted key, and metadata
-        """
+        """Encrypts data using RSA for the key and AES for the content."""
         try:
-            # Convert data to JSON string if it's a dictionary
+            # Convert data to JSON string if dictionary
             if isinstance(data, dict):
                 data = json.dumps(data)
 
@@ -50,11 +38,9 @@ class HybridEncryption:
             if isinstance(data, str):
                 data = data.encode('utf-8')
 
-            # Try to normalize the key format if it's not in PEM format
+            # Normalize the key format
             if not public_key_str.startswith('-----BEGIN PUBLIC KEY-----'):
-                # If it's just base64, try to add PEM headers
                 pem_key = "-----BEGIN PUBLIC KEY-----\n"
-                # Insert newlines every 64 characters
                 for i in range(0, len(public_key_str), 64):
                     pem_key += public_key_str[i:i + 64] + "\n"
                 pem_key += "-----END PUBLIC KEY-----"
@@ -62,9 +48,8 @@ class HybridEncryption:
 
             # Import the public key
             public_key = RSA.import_key(public_key_str)
-
             # Generate a random AES key
-            aes_key = get_random_bytes(16)  # 128-bit key
+            aes_key = get_random_bytes(16)
 
             # Encrypt the data with AES
             cipher_aes = AES.new(aes_key, AES.MODE_CBC)
@@ -86,25 +71,13 @@ class HybridEncryption:
             }
 
         except Exception as e:
-            print(f"Error in hybrid encryption: {str(e)}")
             traceback.print_exc()
 
             # Fall back to symmetric encryption
             return self.encrypt_symmetric(data)
 
     def decrypt_hybrid_request(self, encrypted_key_base64, iv_base64, encrypted_data_base64, private_key):
-        """
-        Decrypts a hybrid-encrypted request from a client
-
-        Parameters:
-        encrypted_key_base64 (str): Base64-encoded RSA-encrypted AES key
-        iv_base64 (str): Base64-encoded initialization vector
-        encrypted_data_base64 (str): Base64-encoded AES-encrypted data
-        private_key (RSAPrivateKey): The server's RSA private key
-
-        Returns:
-        str: The decrypted data
-        """
+        """Decrypts a message that used hybrid RSA/AES encryption."""
         try:
             # Decode all components from Base64
             encrypted_key = base64.b64decode(encrypted_key_base64)
@@ -130,20 +103,11 @@ class HybridEncryption:
             return decrypted_data.decode('utf-8')
 
         except Exception as e:
-            print(f"Error in hybrid request decryption: {str(e)}")
             traceback.print_exc()
             raise
 
     def encrypt_symmetric(self, data):
-        """
-        Fall back to simple symmetric encryption
-
-        Parameters:
-        data (dict/str): Data to encrypt
-
-        Returns:
-        dict: Dictionary with encrypted data using symmetric encryption
-        """
+        """Provides symmetric encryption as a fallback when RSA is unavailable."""
         try:
             # Convert to JSON string if it's a dictionary
             if isinstance(data, dict):
@@ -171,19 +135,10 @@ class HybridEncryption:
             }
 
         except Exception as e:
-            print(f"Symmetric encryption error: {str(e)}")
             return {"error": "Encryption failed"}
 
     def decrypt_symmetric(self, encrypted_data):
-        """
-        Decrypt data that was encrypted with symmetric encryption
-
-        Parameters:
-        encrypted_data (dict/str): Encrypted data
-
-        Returns:
-        dict/str: Decrypted data
-        """
+        """Decrypts data that was encrypted with symmetric AES."""
         try:
             # Handle different input formats
             if isinstance(encrypted_data, dict):
@@ -206,12 +161,7 @@ class HybridEncryption:
             # Convert to string
             decrypted_str = decrypted_data.decode('utf-8')
 
-            # Try to parse as JSON if possible
-            try:
-                return json.loads(decrypted_str)
-            except json.JSONDecodeError:
-                return decrypted_str
+            return json.loads(decrypted_str)
 
         except Exception as e:
-            print(f"Symmetric decryption error: {str(e)}")
             raise
