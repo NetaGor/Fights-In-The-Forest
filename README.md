@@ -3,13 +3,6 @@
 A multiplayer strategy combat game inspired by D&D.
 
 
-## Features
-
-- **Multiplayer Combat**: Real-time multiplayer battles
-- **D&D-Inspired Mechanics**: Turn-based combat system inspired by tabletop RPGs
-- **Strategic Gameplay**: Tactical combat requiring planning and strategy
-
-
 ## Prerequisites
 
 ### Client (Android)
