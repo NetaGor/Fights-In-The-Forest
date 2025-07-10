@@ -134,4 +134,4 @@ def check_password(stored_hash, password):
 def user_exists(username):
     """Checks if a username already exists in the database."""
     query = db.collection("users").where('username', '==', username).get()
-    return len(query) > 0
+    return len(query) == 1

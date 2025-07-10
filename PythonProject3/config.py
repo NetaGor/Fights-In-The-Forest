@@ -16,7 +16,7 @@ def initialize_firebase():
     firebase_admin.initialize_app(cred)
     return firestore.client()
 
-# Create Flask app with CORS support to allow cross-origin requests
+# Create Flask app with CORS support
 app = Flask(__name__)
 CORS(app, resources={
     r"/*": {
