@@ -1,9 +1,7 @@
-# security/__init__.py
 """
 Security package initialization for encryption utilities.
 """
 
-# Make the main encryption utilities available at package level
 from .hybrid_encryption import HybridEncryption
 from .encryption_utils import (
     encrypt_response,

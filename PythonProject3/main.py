@@ -1,10 +1,9 @@
 """
-Main application entry point for the Fights in the Forest game server.
+Application entry point for Fights in the Forest server.
 """
 
 from config import app, socketio
 
-# Import all routes and event handlers
 import routes.auth_routes
 import routes.character_routes
 import routes.room_routes
