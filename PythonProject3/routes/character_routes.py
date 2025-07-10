@@ -11,15 +11,13 @@ Handles:
 import traceback
 import uuid
 from flask import request, jsonify
-from config import app, db, USERS_COLLECTION
-from security.encryption_utils import (
-    encrypt_response, decrypt_request, encrypt_for_database, decrypt_from_database
-)
+from config import app, db
+from security.encryption_utils import (encrypt_response, decrypt_request, encrypt_for_database, decrypt_from_database)
 
 
 def get_characters_func(username):
     """Retrieve all characters for a user with proper decryption."""
-    user_ref = db.collection(USERS_COLLECTION).document(username)
+    user_ref = db.collection("users").document(username)
     collection_ref = user_ref.collection("characters")
     docs = collection_ref.stream()
 
@@ -40,7 +38,7 @@ def get_characters_func(username):
 
 def get_character_func(username, name):
     """Retrieve a specific character by name with decryption."""
-    user_ref = db.collection(USERS_COLLECTION).document(username)
+    user_ref = db.collection("users").document(username)
     collection_ref = user_ref.collection("characters")
 
     character_docs = collection_ref.where('unencrypted_name', '==', name).limit(1).stream()
@@ -73,7 +71,7 @@ def get_character_func(username, name):
 
 def update_characters(username, new_data):
     """Update characters collection with encryption."""
-    user_ref = db.collection(USERS_COLLECTION).document(username)
+    user_ref = db.collection("users").document(username)
     characters_ref = user_ref.collection("characters")
 
     existing_characters = {}
@@ -114,7 +112,7 @@ def generate_unique_character_id(username):
     """Generate a unique ID for a new character."""
     while True:
         new_id = str(uuid.uuid4())
-        user_ref = db.collection(USERS_COLLECTION).document(username)
+        user_ref = db.collection("users").document(username)
         characters_ref = user_ref.collection("characters")
         existing_character = characters_ref.document(new_id).get()
 
@@ -135,7 +133,7 @@ def get_characters():
         response_data = {"characters": characters}
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred during loading."}), 500
 
@@ -155,7 +153,7 @@ def get_character():
         response_data = {"character": character}
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred during loading."}), 500
 
@@ -210,7 +208,7 @@ def save_character():
         response_data = {"message": "Character saved successfully", "characters": characters}
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred saving character."}), 500
 
@@ -230,7 +228,7 @@ def delete_character():
             return jsonify(encrypt_response(error_response, username)), 400
 
         # Get the user document reference
-        user_ref = db.collection(USERS_COLLECTION).document(username)
+        user_ref = db.collection("users").document(username)
         characters_ref = user_ref.collection("characters")
 
         # First try to find character by unencrypted name
@@ -267,7 +265,7 @@ def delete_character():
         response_data = {"message": "Character deleted successfully"}
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred deleting character."}), 500
 
@@ -289,7 +287,7 @@ def get_abilities():
 
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred fetching abilities."}), 500
 
@@ -329,6 +327,6 @@ def get_ability_details():
 
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred getting ability details."}), 500

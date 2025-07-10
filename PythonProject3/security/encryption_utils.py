@@ -12,9 +12,9 @@ import base64
 import json
 import bcrypt
 import traceback
-from Crypto.PublicKey import RSA
+from Cryptodome.PublicKey import RSA
 from security.hybrid_encryption import HybridEncryption
-from config import db, USERS_COLLECTION
+from config import db
 
 # Initialize hybrid encryption
 hybrid_encryption = HybridEncryption()
@@ -37,7 +37,7 @@ def get_public_key(username):
         if username is None:
             return None
 
-        user_docs = db.collection(USERS_COLLECTION).where('username', '==', username).get()
+        user_docs = db.collection("users").where('username', '==', username).get()
 
         if not user_docs or len(user_docs) == 0:
             return None
@@ -98,7 +98,7 @@ def decrypt_request(request_data):
 
 
 def encrypt_for_database(data):
-    """Encrypts sensitive data before storing it in the database."""
+    """Encrypts data before storing it in the database."""
     try:
         encrypted = hybrid_encryption.encrypt_symmetric(data)
         return {
@@ -122,7 +122,7 @@ def decrypt_from_database(encrypted_data):
 
 
 def hash_password(password):
-    """Securely hashes a password using bcrypt with salt."""
+    """Hashes a password using bcrypt."""
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
@@ -133,5 +133,5 @@ def check_password(stored_hash, password):
 
 def user_exists(username):
     """Checks if a username already exists in the database."""
-    query = db.collection(USERS_COLLECTION).where('username', '==', username).get()
+    query = db.collection("users").where('username', '==', username).get()
     return len(query) > 0

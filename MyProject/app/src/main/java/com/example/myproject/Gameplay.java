@@ -5,7 +5,6 @@
  * - Real-time turn management via Socket.IO
  * - Character abilities and health tracking
  * - Encrypted communication with server
- * - Combat animations and visual feedback
  */
 package com.example.myproject;
 
@@ -483,26 +482,15 @@ public class Gameplay extends AppCompatActivity implements View.OnClickListener 
             String chatMsg = data.getString("chat");
 
             runOnUiThread(() -> {
-                // In the onMoveMade method
                 if (data.has("health")) {
                     try {
                         JSONObject healthUpdates = data.getJSONObject("health");
-
-                        // Handle health updates by username
                         for (Iterator<String> it = healthUpdates.keys(); it.hasNext(); ) {
                             String key = it.next();
-
-                            // Skip the character_name entry which is just for reference
                             if (key.equals("character_name")) continue;
-
                             int hp = healthUpdates.getInt(key);
-
-                            // Update the health in our local map
                             characterHealth.put(key, hp);
-                            Log.d(TAG, "Updated health for player " + key + ": " + hp);
                         }
-
-                        // Update character objects with new health values
                         updateGroupCharactersHealth();
                     } catch (JSONException e) {
                         Log.e(TAG, "Error updating health: " + e.getMessage());
@@ -635,9 +623,7 @@ public class Gameplay extends AppCompatActivity implements View.OnClickListener 
             String reason = data.getString("reason");
 
             runOnUiThread(() -> {
-                Toast.makeText(Gameplay.this,
-                        "Game failed to start: " + reason,
-                        Toast.LENGTH_LONG).show();
+                Toast.makeText(Gameplay.this, "Game failed to start: " + reason, Toast.LENGTH_LONG).show();
 
                 finish();
             });
@@ -1036,20 +1022,13 @@ public class Gameplay extends AppCompatActivity implements View.OnClickListener 
                                         charName,
                                         characterObject.getString("desc"),
                                         playerUsername);
-
-                                // Update character to username mapping
                                 characterToUsername.put(charName, playerUsername);
-
-                                // Only initialize health to 50 if this is a new player we haven't seen yet
                                 if (!characterHealth.containsKey(playerUsername)) {
                                     characterHealth.put(playerUsername, 50);
-                                    Log.d(TAG, "Initialized new player health: " + playerUsername + " = 50");
                                     character.setHealth(50);
                                 } else {
                                     int currentHealth = characterHealth.get(playerUsername);
                                     character.setHealth(currentHealth);
-                                    Log.d(TAG, "Set character health for group2: " + charName +
-                                            " (player: " + playerUsername + ") health = " + currentHealth);
                                 }
 
                                 newGroup2.add(character);
@@ -1075,23 +1054,16 @@ public class Gameplay extends AppCompatActivity implements View.OnClickListener 
      * Updates the health values of characters in both groups based on the characterHealth map
      */
     private void updateGroupCharactersHealth() {
-        // Update health for characters in group1
         for (CharactersList character : group1) {
             String username = character.getUsername();
             if (characterHealth.containsKey(username)) {
                 character.setHealth(characterHealth.get(username));
-                Log.d(TAG, "Updated group1 character " + character.getCharacterName() +
-                        " health to: " + character.getHealth());
             }
         }
-
-        // Update health for characters in group2
         for (CharactersList character : group2) {
             String username = character.getUsername();
             if (characterHealth.containsKey(username)) {
                 character.setHealth(characterHealth.get(username));
-                Log.d(TAG, "Updated group2 character " + character.getCharacterName() +
-                        " health to: " + character.getHealth());
             }
         }
     }

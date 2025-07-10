@@ -2,7 +2,6 @@
  * HealthAdapter - ListView adapter for character health display
  *
  * Shows character health with visual indicators (bars, colors).
- * Updated to track health by username instead of character name.
  */
 package com.example.myproject;
 

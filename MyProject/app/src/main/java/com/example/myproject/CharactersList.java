@@ -1,8 +1,7 @@
 /**
  * CharactersList - Data model for game characters
  *
- * Stores character info including name, description, abilities,
- * owner, and health. Serializable for passing between activities.
+ * Stores character info including name, description, abilities, owner, and health.
  */
 package com.example.myproject;
 

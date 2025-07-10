@@ -12,9 +12,7 @@ import traceback
 import random
 from flask import request, jsonify
 from config import app, db, active_rooms
-from security.encryption_utils import (
-    encrypt_response, decrypt_request, encrypt_for_database
-)
+from security.encryption_utils import (encrypt_response, decrypt_request, encrypt_for_database)
 from routes.character_routes import get_characters_func
 
 
@@ -117,7 +115,7 @@ def join_room_route():
         response_data = {'message': f'{username} joined room {room_code}'}
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred joining room."}), 500
 
@@ -148,7 +146,7 @@ def create_room():
             'group1': {},
             'group2': {},
             'ready_players': [],
-            'character_health': character_health,  # Store encrypted empty dictionary
+            'character_health': character_health,
             'game_state': {
                 'status': 'not started',
                 'turn': 1,
@@ -163,7 +161,7 @@ def create_room():
         response_data = {'room_code': room_code}
         return jsonify(encrypt_response(response_data, username)), 201
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "Error creating room"}), 500
 
@@ -225,7 +223,7 @@ def remove_player_from_room():
         response_data = {'message': f'Player {username} removed from room {room_code}'}
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred removing player from room."}), 500
 
@@ -258,12 +256,10 @@ def get_group1():
                 "desc": "desc"
             })
 
-        print(characters)
-
         response_data = {"characters": characters}
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred getting group1 data."}), 500
 
@@ -299,6 +295,6 @@ def get_group2():
         response_data = {"characters": characters}
         return jsonify(encrypt_response(response_data, username))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred getting group2 data."}), 500

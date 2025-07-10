@@ -9,11 +9,8 @@ Provides secure endpoints for:
 
 import traceback
 from flask import request, jsonify
-from config import app, db, USERS_COLLECTION
-from security.encryption_utils import (
-    encrypt_response, decrypt_request, hash_password,
-    check_password, user_exists, hybrid_encryption
-)
+from config import app, db
+from security.encryption_utils import (encrypt_response, decrypt_request, hash_password, check_password, user_exists, hybrid_encryption)
 
 
 @app.route('/register', methods=['POST'])
@@ -33,7 +30,7 @@ def register():
                 try:
                     encrypted_response = hybrid_encryption.encrypt_with_public_key(error_response, user_public_key)
                     return jsonify(encrypted_response), 400
-                except Exception as e:
+                except Exception:
                     raise
             return jsonify(hybrid_encryption.encrypt_symmetric(error_response)), 400
 
@@ -47,7 +44,7 @@ def register():
         if user_public_key:
             user_data['public_key'] = user_public_key
 
-        db.collection(USERS_COLLECTION).document(username).set(user_data)
+        db.collection("users").document(username).set(user_data)
 
         success_response = {"status": "success", "message": "User registered successfully."}
 
@@ -55,12 +52,12 @@ def register():
             try:
                 encrypted_response = hybrid_encryption.encrypt_with_public_key(success_response, user_public_key)
                 return jsonify(encrypted_response)
-            except Exception as e:
+            except Exception:
                 raise
 
         return jsonify(hybrid_encryption.encrypt_symmetric(success_response))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred during registration."}), 500
 
@@ -76,7 +73,7 @@ def login():
         password = credentials.get('password')
         user_public_key = credentials.get('public_key')
 
-        query = db.collection(USERS_COLLECTION).where('username', '==', username).get()
+        query = db.collection("users").where('username', '==', username).get()
 
         if not query or len(query) == 0:
             error_response = {"status": "error", "message": "User does not exist."}
@@ -84,7 +81,7 @@ def login():
                 try:
                     encrypted_response = hybrid_encryption.encrypt_with_public_key(error_response, user_public_key)
                     return jsonify(encrypted_response), 400
-                except Exception as e:
+                except Exception:
                     raise
 
             return jsonify(hybrid_encryption.encrypt_symmetric(error_response)), 400
@@ -99,13 +96,13 @@ def login():
                 try:
                     encrypted_response = hybrid_encryption.encrypt_with_public_key(error_response, user_public_key)
                     return jsonify(encrypted_response), 400
-                except Exception as e:
+                except Exception:
                     raise
 
             return jsonify(hybrid_encryption.encrypt_symmetric(error_response)), 400
 
         if user_public_key:
-            db.collection(USERS_COLLECTION).document(username).update({
+            db.collection("users").document(username).update({
                 'public_key': user_public_key
             })
 
@@ -115,11 +112,11 @@ def login():
             try:
                 encrypted_response = hybrid_encryption.encrypt_with_public_key(success_response, user_public_key)
                 return jsonify(encrypted_response)
-            except Exception as e:
+            except Exception:
                raise
 
         return jsonify(hybrid_encryption.encrypt_symmetric(success_response))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return jsonify({"status": "error", "message": "An error occurred during login."}), 500

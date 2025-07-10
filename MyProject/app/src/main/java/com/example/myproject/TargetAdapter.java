@@ -2,7 +2,6 @@
  * TargetAdapter - ListView adapter for target selection
  *
  * Displays characters with health info for ability targeting.
- * Updated to use username-based health tracking and only show characters with health > 0.
  */
 package com.example.myproject;
 
@@ -28,9 +27,6 @@ public class TargetAdapter extends ArrayAdapter<CharactersList> {
         this.filteredCharacters = filterAliveCharacters(characters);
     }
 
-    /**
-     * Filter to only show characters with health > 0
-     */
     private static List<CharactersList> filterAliveCharacters(List<CharactersList> characters) {
         List<CharactersList> aliveCharacters = new ArrayList<>();
         for (CharactersList character : characters) {
@@ -70,7 +66,6 @@ public class TargetAdapter extends ArrayAdapter<CharactersList> {
             characterNameView.setText(character.getCharacterName());
             usernameView.setText("Player: " + character.getUsername());
 
-            // Get health by username instead of character name
             String playerUsername = character.getUsername();
             Integer health = Gameplay.characterHealth.get(playerUsername);
 

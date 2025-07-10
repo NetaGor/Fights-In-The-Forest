@@ -20,11 +20,10 @@ def initialize_firebase():
 app = Flask(__name__)
 CORS(app, resources={
     r"/*": {
-        "origins": "*",
+        "origins": ["http://127.0.0.1:8080"],
         "allow_headers": [
             "Content-Type",
-            "Authorization",
-            "Access-Control-Allow-Credentials"
+            "Authorization"
         ],
         "supports_credentials": True
     }
@@ -33,7 +32,7 @@ CORS(app, resources={
 # Configure SocketIO with settings for real-time game communication
 socketio = SocketIO(
     app,
-    cors_allowed_origins="*",
+    cors_allowed_origins="http://127.0.0.1:8080",
     async_mode='eventlet',
     ping_timeout=25000,
     ping_interval=10000,
@@ -43,8 +42,7 @@ socketio = SocketIO(
 
 # Initialize Firebase database connection
 db = initialize_firebase()
-
-USERS_COLLECTION = "users"
+print("Connected database")
 
 active_rooms = {}            # Maps room codes to lists of connected clients
 active_turn_timers = {}      # Maps room codes to turn timer data

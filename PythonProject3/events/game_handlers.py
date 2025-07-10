@@ -1,91 +1,63 @@
 """
-Game logic and event handlers for gameplay mechanics with improved player defeat handling.
+Game logic and event handlers for gameplay mechanics.
 """
-
 import time
 import traceback
 from config import socketio, db, active_rooms, active_turn_timers, disconnection_timers
-from security.encryption_utils import (
-    encrypt_response, decrypt_request, encrypt_for_database, decrypt_from_database
-)
+from security.encryption_utils import (encrypt_response, decrypt_request, encrypt_for_database, decrypt_from_database)
 
 
 def start_first_turn(room_code):
-    """Starts the first turn for a game using the room's player order."""
-    # Get current player from room data
+    """Initiates the first turn for a new game using the room's configured player order."""
     room_ref = db.collection('rooms').document(room_code)
     room_doc = room_ref.get()
-
-    if not room_doc.exists:
-        return
-
     room_data = room_doc.to_dict()
-    if room_data.get('game_state', {}).get('status') != 'started':
-        return
 
     current_turn = room_data['game_state']['turn']
     player_order = room_data['game_state']['player_order']
 
-    if not player_order:
-        return
-
-    # Get the first active player
+    # Select first active player and determine who goes next
     current_player = player_order[current_turn % len(player_order)]
     next_player = find_next_active_player(room_code, current_player, player_order)
-
-    # Update room data with current and next player
     room_data['game_state']['current_player'] = current_player
     room_data['game_state']['next_player'] = next_player
     room_ref.set(room_data)
 
-    # Start timer for this turn
+    # Start timer for the first player's turn
     start_turn_timer(room_code, current_player, next_player)
 
 
 def find_next_active_player(room_code, current_player, player_order):
-    """
-    Find the next active player in the order, skipping defeated players.
-    Returns the username of the next active player.
-    """
+    """Locates the next player in sequence who hasn't been defeated yet."""
     if not player_order or len(player_order) <= 1:
         return ""
 
-    # Get room data to check player health
     room_ref = db.collection('rooms').document(room_code)
     room_doc = room_ref.get()
-
-    if not room_doc.exists:
-        return player_order[0]  # Fallback to first player
-
     room_data = room_doc.to_dict()
 
-    # Decrypt character health if it's encrypted
+    # Get decrypted health data
     character_health = room_data.get('character_health', {})
     if isinstance(character_health, dict) and character_health.get("encrypted", False):
         character_health = decrypt_from_database(character_health)
 
-    # Get the index of the current player
+    # Find current player's position
     try:
         current_index = player_order.index(current_player)
     except ValueError:
-        # Current player not in list, start from beginning
         current_index = -1
 
-    # Check each player in order starting from the next one
+    # Check each player in order until we find an active one
     for i in range(1, len(player_order) + 1):
         next_index = (current_index + i) % len(player_order)
         next_player = player_order[next_index]
-
-        if next_player and next_player in character_health:
-            if character_health[next_player] > 0:
+        if next_player in character_health:
+            if character_health[next_player] > 0 and next_player in room_data['players']:
                 return next_player
-
-    # If no active players found (shouldn't happen in normal gameplay)
-    return player_order[(current_index + 1) % len(player_order)]
 
 
 def start_turn_timer(room_code, current_player, next_player):
-    """Starts a 60-second timer for the current player's turn."""
+    """Sets up a 60-second timer for the current player's turn and notifies all players."""
     # Cancel any existing timer for this room
     if room_code in active_turn_timers:
         timer = active_turn_timers[room_code].get('timer')
@@ -96,7 +68,7 @@ def start_turn_timer(room_code, current_player, next_player):
     start_time = int(time.time())
     end_time = start_time + 60  # 60 seconds
 
-    # Store timer data without scheduling an expiration timer
+    # Store timer data
     active_turn_timers[room_code] = {
         'current_player': current_player,
         'next_player': next_player,
@@ -117,20 +89,15 @@ def start_turn_timer(room_code, current_player, next_player):
         for client in active_rooms[room_code]:
             client_username = client.get("username")
             sid = client.get("sid")
-
             if client_username and sid:
                 encrypted_notification = encrypt_response(notification_data, client_username)
                 socketio.emit('turn_started', encrypted_notification, to=sid)
 
 
 def next_turn(room_code):
-    """Advances game to next turn and returns the current and next players."""
+    """Advances the game to the next player's turn, ensuring we skip defeated players."""
     room_ref = db.collection('rooms').document(room_code)
     room_doc = room_ref.get()
-
-    if not room_doc.exists:
-        return None, None
-
     room_data = room_doc.to_dict()
 
     if room_data['game_state']['status'] != 'started':
@@ -143,49 +110,18 @@ def next_turn(room_code):
     # Get player order
     player_order = room_data['game_state']['player_order']
 
-    if not player_order:
-        return None, None
-
-    # Filter out defeated players from player_order
-    updated_player_order = []
-
-    # Decrypt character_health if needed
-    character_health = room_data.get('character_health', {})
-    if isinstance(character_health, dict) and character_health.get("encrypted", False):
-        character_health = decrypt_from_database(character_health)
-
-    for player in player_order:
-        # Keep player if character is still alive
-        if player and player in character_health:
-            if character_health[player] > 0:
-                updated_player_order.append(player)
-
-    # Use the updated player order
-    room_data['game_state']['player_order'] = updated_player_order
-
-    # If no players left, end the game (should be handled elsewhere)
-    if not updated_player_order:
-        return None, None
-
     # The current player should be the next_player from previous turn
     if 'next_player' in room_data['game_state']:
-        # Use the previously calculated next player as current player
         current_player = room_data['game_state']['next_player']
     else:
-        # Fallback if next_player wasn't set
-        current_player = updated_player_order[current_turn % len(updated_player_order)]
+        current_player = player_order[current_turn % len(player_order)]
 
     # Find next active player
-    next_player = find_next_active_player(room_code, current_player, updated_player_order)
+    next_player = find_next_active_player(room_code, current_player, player_order)
 
     # Update current_player and next_player in game state
     room_data['game_state']['current_player'] = current_player
     room_data['game_state']['next_player'] = next_player
-
-    # Encrypt any sensitive data before saving
-    if 'character_health' in room_data:
-        if not (isinstance(room_data['character_health'], dict) and room_data['character_health'].get("encrypted", False)):
-            room_data['character_health'] = encrypt_for_database(room_data['character_health'])
 
     # Save the updated player order and player references
     room_ref.set(room_data)
@@ -195,20 +131,20 @@ def next_turn(room_code):
 
 @socketio.on('game_started')
 def on_game_started(data):
-    """Handles the game started event and initializes the first turn."""
+    """Handles game initialization when all players are ready to start."""
     try:
         request_json = decrypt_request(data)
         room_code = request_json.get('room_code')
 
         # Start the first turn
         start_first_turn(room_code)
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
 
 
 @socketio.on('get_ability')
 def on_get_ability(data):
-    """Returns ability details including type, description, and dice values."""
+    """Fetches ability details for a player, including type, description, and dice values."""
     try:
         request_json = decrypt_request(data)
 
@@ -240,15 +176,15 @@ def on_get_ability(data):
 
         return encrypt_response(response_data, username)
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        error_response = {'error': f'Error processing ability: {str(e)}'}
+        error_response = {'error': 'Error processing ability'}
         return encrypt_response(error_response, username) if username else error_response
 
 
 @socketio.on('make_move')
 def on_make_move(data):
-    """Processes a player's turn action and updates game state."""
+    """Processes a player's combat action, updates health values, and advances to the next turn."""
     try:
         request_json = decrypt_request(data)
 
@@ -260,8 +196,7 @@ def on_make_move(data):
         value = request_json.get('value')
         room_code = request_json.get('room_code')
         character = request_json.get('character')
-        print(target_player)
-        print("1")
+
         if not all([username, ability, target, move_type, room_code, character]):
             error_response = {'error': 'Missing required fields'}
             return encrypt_response(error_response, username)
@@ -271,8 +206,7 @@ def on_make_move(data):
             timer = active_turn_timers[room_code].get('timer')
             if timer:
                 timer.cancel()
-        print("2")
-        print(target_player)
+
         # Get room data
         room_ref = db.collection('rooms').document(room_code)
         room_doc = room_ref.get()
@@ -282,18 +216,17 @@ def on_make_move(data):
             return encrypt_response(error_response, username)
 
         room_data = room_doc.to_dict()
-        print("3")
+
         # Decrypt character_health if it's encrypted
         character_health = room_data.get('character_health', {})
         if isinstance(character_health, dict) and character_health.get("encrypted", False):
             character_health = decrypt_from_database(character_health)
             room_data['character_health'] = character_health
 
-        print(target_player)
         # Check if it's this player's turn
         current_turn = room_data['game_state']['turn']
         player_order = room_data['game_state']['player_order']
-        print("4")
+
         if not player_order:
             error_response = {'error': 'No players in game order'}
             return encrypt_response(error_response, username)
@@ -307,17 +240,15 @@ def on_make_move(data):
             error_response = {'error': 'Not your turn'}
             return encrypt_response(error_response, username)
 
-        # Process the move effects
         # Get ability details
         ability_docs = db.collection("ability").where('name', '==', ability).limit(1).get()
-        print(target_player)
+
         if not ability_docs or len(ability_docs) == 0:
             error_response = {'error': 'Ability not found'}
             return encrypt_response(error_response, username)
 
         ability_data = ability_docs[0].to_dict()
         chat_message = ability_data.get("chat", "")
-        print("5")
 
         # Replace placeholders in chat message
         chat_message = chat_message.replace("[player1]", target)
@@ -325,9 +256,8 @@ def on_make_move(data):
 
         # Identify target player's group and username
         target_group = None
-        print(target_player)
+
         for player_username, character_name in room_data.get('group1', {}).items():
-            print()
             if player_username == target_player:
                 target_group = 'group1'
                 break
@@ -339,17 +269,15 @@ def on_make_move(data):
                     break
 
         if target_group is None:
-            print("group error")
             error_response = {'error': 'Target not found'}
             return encrypt_response(error_response, username)
-        print("6")
 
         # Update health in game state if not already there
         if 'character_health' not in room_data:
             room_data['character_health'] = {}
 
         if target_player not in room_data['character_health']:
-            room_data['character_health'][target_player] = 50  # Default starting health
+            room_data['character_health'][target_player] = 50
 
         # Apply effect based on move type
         current_health = room_data['character_health'][target_player]
@@ -358,11 +286,10 @@ def on_make_move(data):
             new_health = max(0, current_health - value)
             effect_message = f"{target} took {value} damage!"
         else:  # Heal
-            new_health = min(50, current_health + value)  # Assume max health is 50
+            new_health = min(50, current_health + value)
             effect_message = f"{target} healed for {value} health!"
 
         room_data['character_health'][target_player] = new_health
-        print("7")
 
         # Add to chat log if not already there
         if 'chat_log' not in room_data:
@@ -380,12 +307,10 @@ def on_make_move(data):
         room_data['chat_log'].append(encrypted_chat_entry)
 
         if new_health <= 0:
-            # Remove the defeated player from turn order if they're in it
             if target_player and target_player in room_data['game_state']['player_order']:
                 if target_player in room_data['game_state']['next_player']:
-                    room_data['game_state']['next_player'] = find_next_active_player(room_code, current_player, room_data['game_state']['player_order'])
+                    room_data['game_state']['next_player'] = find_next_active_player(room_code, target_player, room_data['game_state']['player_order'])
                 room_data['game_state']['player_order'].remove(target_player)
-
 
         # Check if game is over (all players in a group defeated)
         group1_all_dead = True
@@ -401,7 +326,6 @@ def on_make_move(data):
                 group2_all_dead = False
                 break
 
-
         # Check if round limit reached
         game_over = False
         winner = None
@@ -412,9 +336,8 @@ def on_make_move(data):
         elif group2_all_dead:
             game_over = True
             winner = 'group1'
-        elif current_turn >= len(room_data['character_health']) * 15:  # Round limit (15 rounds)
+        elif current_turn >= len(room_data['character_health']) * 15:
             game_over = True
-            # Determine winner based on total remaining health
             group1_health = 0
             group2_health = 0
 
@@ -452,12 +375,10 @@ def on_make_move(data):
             for client in active_rooms[room_code]:
                 client_username = client.get("username")
                 sid = client.get("sid")
-
                 if client_username and sid:
                     encrypted_notification = encrypt_response(end_notification, client_username)
                     socketio.emit('game_ended', encrypted_notification, to=sid)
 
-        print(room_data['character_health'])
         # Encrypt character_health before storing
         room_data['character_health'] = encrypt_for_database(room_data['character_health'])
 
@@ -466,10 +387,7 @@ def on_make_move(data):
 
         # If game not over, advance to next turn
         if not game_over:
-            # Get the next players
             current_player, next_player = next_turn(room_code)
-
-            # Notify clients about move and effects
             move_notification = {
                 'event': 'move_made',
                 'username': username,
@@ -478,8 +396,8 @@ def on_make_move(data):
                 'effect': effect_message,
                 'chat': chat_message,
                 'health': {
-                    target_player: new_health,  # Send username as key instead of character name
-                    'character_name': target    # Include target character name for client-side lookup
+                    target_player: new_health,
+                    'character_name': target
                 },
                 'current_player': current_player,
                 'next_player': next_player
@@ -500,15 +418,15 @@ def on_make_move(data):
         response_data = {'success': True}
         return encrypt_response(response_data, username)
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        error_response = {'error': f'Error making move: {str(e)}'}
+        error_response = {'error': 'Error making move: {str(e)}'}
         return encrypt_response(error_response, username) if username else error_response
 
 
 @socketio.on('skip_turn')
 def on_skip_turn(data):
-    """Processes a player skipping their turn and advances to the next player."""
+    """Allows a player to skip their turn without making any moves."""
     try:
         request_json = decrypt_request(data)
         username = request_json.get('username')
@@ -527,10 +445,6 @@ def on_skip_turn(data):
         # Get room data
         room_ref = db.collection('rooms').document(room_code)
         room_doc = room_ref.get()
-
-        if not room_doc.exists:
-            error_response = {'error': 'Room not found'}
-            return encrypt_response(error_response, username)
 
         room_data = room_doc.to_dict()
 
@@ -583,11 +497,9 @@ def on_skip_turn(data):
 
         # Check for round limit/game end condition
         game_over = False
-        winner = None
 
-        if current_turn >= 10:  # Round limit (10 rounds)
+        if current_turn >= len(room_data['character_health']) * 15:
             game_over = True
-            # Determine winner based on total remaining health
             group1_health = 0
             group2_health = 0
 
@@ -628,7 +540,7 @@ def on_skip_turn(data):
                 room_data['game_state']['status'] = 'ended'
                 room_data['game_state']['winner'] = winner
 
-                # Notify all players about game end
+                # Notify all players about game end with encryption
                 end_notification = {
                     'event': 'game_ended',
                     'winner': winner
@@ -676,15 +588,15 @@ def on_skip_turn(data):
         response_data = {'success': True}
         return encrypt_response(response_data, username)
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        error_response = {'error': f'Error skipping turn: {str(e)}'}
+        error_response = {'error': 'Error skipping turn'}
         return encrypt_response(error_response, username) if username else error_response
 
 
 @socketio.on('get_game_state')
 def on_get_game_state(data):
-    """Returns the current game state with decrypted sensitive data."""
+    """Retrieves the current game state for a player, including health values and chat history."""
     try:
         request_json = decrypt_request(data)
 
@@ -749,20 +661,21 @@ def on_get_game_state(data):
                     game_state['current_player'] = player_order[current_index]
 
                     # Find next active player
-                    game_state['next_player'] = find_next_active_player(room_code, game_state['current_player'], player_order)
+                    game_state['next_player'] = find_next_active_player(room_code, game_state['current_player'],
+                                                                        player_order)
 
         response_data = {'game_state': game_state}
         return encrypt_response(response_data, username)
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        error_response = {'error': f'Error getting game state: {str(e)}'}
+        error_response = {'error': 'Error getting game state'}
         return encrypt_response(error_response, username) if username else error_response
 
 
 @socketio.on('reconnect_to_game')
 def on_reconnect_to_game(data):
-    """Handles player reconnection to an ongoing game and syncs game state."""
+    """Handles player reconnection by syncing game state and canceling any disconnection timers."""
     try:
         request_json = decrypt_request(data)
 
@@ -835,7 +748,7 @@ def on_reconnect_to_game(data):
         # Decrypt chat log for reconnection sync
         chat_log = []
         if 'chat_log' in room_data and room_data['chat_log']:
-            # Get the last 10 messages
+            # Get the last 20 messages
             recent_chat = room_data['chat_log'][-20:]
             for chat_entry in recent_chat:
                 if isinstance(chat_entry, dict) and chat_entry.get("encrypted", False):
@@ -858,17 +771,13 @@ def on_reconnect_to_game(data):
             'turn': current_turn
         }
 
-        # Find the player's socket and send the sync data
-        player_sid = None
+        # Find the player's socket and send the sync data with encryption
         if room_code in active_rooms:
             for client in active_rooms[room_code]:
                 if client.get("username") == username:
-                    player_sid = client.get("sid")
+                    encrypted_sync = encrypt_response(reconnection_data, username)
+                    socketio.emit('reconnection_sync', encrypted_sync, to=client.get("sid"))
                     break
 
-        if player_sid:
-            encrypted_sync = encrypt_response(reconnection_data, username)
-            socketio.emit('reconnection_sync', encrypted_sync, to=player_sid)
-
-    except Exception as e:
+    except Exception:
         traceback.print_exc()

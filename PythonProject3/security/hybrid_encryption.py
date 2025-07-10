@@ -7,10 +7,10 @@ Handles:
 - Secure key and data handling
 """
 
-from Crypto.Cipher import AES, PKCS1_v1_5
-from Crypto.PublicKey import RSA
-from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import pad, unpad
+from Cryptodome.Cipher import AES, PKCS1_v1_5
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Random import get_random_bytes
+from Cryptodome.Util.Padding import pad, unpad
 import base64
 import json
 import traceback
